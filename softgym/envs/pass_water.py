@@ -51,13 +51,13 @@ class PassWater1DEnv(FluidEnv):
         elif observation_mode == 'cam_rgb':
             self.observation_space = Box(low=-np.inf, high=np.inf, shape=(self.camera_height, self.camera_width, 3),
                                          dtype=np.float32)
-
+        
         default_config = self.get_default_config()
         border = default_config['glass']['border'] #* default_config['fluid']['rest_dis_coef']
         if action_mode == 'direct': # control the movement of the cup
             self.action_direct_dim = 1
-            action_low = np.array([-0.011])
-            action_high = np.array([0.011])
+            action_low = np.array([-0.11])
+            action_high = np.array([0.11])
             self.action_space = Box(action_low, action_high, dtype=np.float32)
         elif action_mode in ['sawyer', 'franka']:
             self.action_tool = RobotBase(action_mode)
@@ -124,23 +124,24 @@ class PassWater1DEnv(FluidEnv):
         else:
             for idx in range(num_variations):
                 print("pass water generate env variations {}".format(idx))
-                dim_x = random.choice(dim_xs)
-                dim_z = random.choice(dim_zs)
+                #dim_x = random.choice(dim_xs)
+                #dim_z = random.choice(dim_zs)
+                dim_x = 5
+                dim_z = 6
                 m = min(dim_x, dim_z)
-                p = np.random.uniform()
+                #p = np.random.uniform()
                 water_radius = config['fluid']['radius'] * config['fluid']['rest_dis_coef']
-                if p < 0.5:  # midium water volumes
-                    print("generate env variation: medium volume water")
-                    dim_y = int(3.5 * m) 
-                    v = dim_x * dim_y * dim_z
-                    h = v / ((dim_x + 1) * (dim_z + 1)) * water_radius / 2
-                    glass_height = h + config['glass']['border']
-                else:
-                    print("generate env variation: large volume water")
-                    dim_y = 4 * m
-                    v = dim_x * dim_y * dim_z
-                    h = v / ((dim_x + 1) * (dim_z + 1)) * water_radius / 3
-                    glass_height = h  +  m * 0.0015 + config['glass']['border']
+                #iif p < 0.5:  # midium water volumes
+                #    print("generate env variation: medium volume water")
+                #    dim_y = int(3.5 * m) 
+                #    v = dim_x * dim_y * dim_z
+                #    h = v / ((dim_x + 1) * (dim_z + 1)) * water_radius / 2
+                #    glass_height = h + config['glass']['border']
+                print("generate env variation: large volume water")
+                dim_y = 4 * m
+                v = dim_x * dim_y * dim_z
+                h = v / ((dim_x + 1) * (dim_z + 1)) * water_radius / 3
+                glass_height = h  +  m * 0.0015 + config['glass']['border']
 
                 # print("dim_x {} dim_y {} dim_z {} glass_height {}".format(dim_x, dim_y, dim_z, glass_height))
                 config_variations[idx]['fluid']['dim_x'] = dim_x
@@ -358,7 +359,8 @@ class PassWater1DEnv(FluidEnv):
             out_glass = float(out_glass) / water_num
             cup_state = np.array([self.glass_x, self.glass_dis_x, self.glass_dis_z, self.height,
                 self._get_current_water_height(), in_glass, out_glass])
-            return np.hstack([pos, cup_state]).flatten()
+            vector_state =  np.hstack([pos, cup_state]).flatten()
+            return vector_state, water_state
         else:
             raise NotImplementedError
 
@@ -405,7 +407,7 @@ class PassWater1DEnv(FluidEnv):
         '''
         # make action as increasement, clip its range
         dx = action[0]
-        dx = np.clip(dx, a_min=self.action_space.low[0], a_max=self.action_space.high[0])
+        #dx = np.clip(dx, a_min=self.action_space.low[0], a_max=self.action_space.high[0])
         x = self.glass_x + dx
 
         # move the glass
