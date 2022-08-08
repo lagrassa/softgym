@@ -29,6 +29,7 @@ class PourWaterPosControlEnv(FluidEnv):
         self.wall_num = 5  # number of glass walls. floor/left/right/front/back
         super().__init__(**kwargs)
         self.get_cached_configs_and_states(cached_states_path, self.num_variations)
+        #self.cached_configs = [self.get_default_config()]
         if observation_mode in ['point_cloud', 'key_point']:
             if observation_mode == 'key_point':
                 obs_dim = 0
@@ -49,8 +50,8 @@ class PourWaterPosControlEnv(FluidEnv):
         if action_mode in ["rotation_bottom", "rotation_top"]:
             self.action_direct_dim = 3
             # control the (x, y) corrdinate of the floor center, and theta its rotation angle.
-            action_low = np.array([-0.01, -0.01, -0.015])
-            action_high = np.array([0.01, 0.01, 0.015])
+            action_low = np.array([-0.11, -0.11, -0.1])
+            action_high = np.array([0.11, 0.11, 0.1])
             self.action_space = Box(action_low, action_high, dtype=np.float32)
         else:
             raise NotImplementedError
@@ -66,7 +67,7 @@ class PourWaterPosControlEnv(FluidEnv):
                 'radius': 0.033,
                 'rest_dis_coef': 0.55,
                 'cohesion': 0.1,  # not actually used, instead, is computed as viscosity * 0.01
-                'viscosity': 2,
+                'viscosity': 0.1,
                 'surfaceTension': 0,
                 'adhesion': 0.0,  # not actually used, instead, is computed as viscosity * 0.001
                 'vorticityConfinement': 40,
@@ -76,7 +77,7 @@ class PourWaterPosControlEnv(FluidEnv):
                 'dim_z': 8,
             },
             'glass': {
-                'border': 0.045,
+                'border': 0.02,
                 'height': 0.6,
                 'glass_distance': 1.0,
                 'poured_border': 0.04,
@@ -98,23 +99,16 @@ class PourWaterPosControlEnv(FluidEnv):
         config_variations = [copy.deepcopy(config) for _ in range(num_variations)]
         for idx in range(num_variations):
             print("pour water generate env variations {}".format(idx))
-            dim_x = random.choice(dim_xs)
-            dim_z = random.choice(dim_zs)
+            dim_x = 5 #random.choice(dim_xs)
+            dim_z = 6 #random.choice(dim_zs)
             m = min(dim_x, dim_z)
-            p = np.random.rand()
+            print("generate env variation: medium volume water")
+            dim_y = int(3.5 * m)
+            v = dim_x * dim_y * dim_z
             water_radius = config['fluid']['radius'] * config['fluid']['rest_dis_coef']
-            if p < 0.5:  # midium water volumes
-                print("generate env variation: medium volume water")
-                dim_y = int(3.5 * m)
-                v = dim_x * dim_y * dim_z
-                h = v / ((dim_x + 1) * (dim_z + 1)) * water_radius / 2
-                glass_height = h + (np.random.rand() - 0.5) * 0.001 + config['glass']['border']
-            else:
-                print("generate env variation: large volume water")
-                dim_y = 4 * m
-                v = dim_x * dim_y * dim_z
-                h = v / ((dim_x + 1) * (dim_z + 1)) * water_radius / 3
-                glass_height = h + (m + np.random.rand()) * 0.001 + config['glass']['border']
+            h = v / ((dim_x + 1) * (dim_z + 1)) * water_radius / 2
+            #glass_height = h + (np.random.rand() - 0.5) * 0.001 + config['glass']['border']
+            glass_height = h + (0.3 - 0.5) * 0.001 + config['glass']['border']
 
             config_variations[idx]['fluid']['dim_x'] = dim_x
             config_variations[idx]['fluid']['dim_y'] = dim_y
@@ -123,9 +117,9 @@ class PourWaterPosControlEnv(FluidEnv):
             # config_variations[idx]['fluid']['viscosity'] = self.rand_float(2.0, 10.0)
 
             config_variations[idx]['glass']['height'] = glass_height
-            config_variations[idx]['glass']['poured_height'] = glass_height + np.random.rand() * 0.1
-            config_variations[idx]['glass']['glass_distance'] = self.rand_float(0.05 * m, 0.09 * m) + (dim_x + 4) * water_radius / 2.
-            config_variations[idx]['glass']['poured_border'] = 0.03
+            config_variations[idx]['glass']['poured_height'] = glass_height + 0.2 * 0.1 #remove random
+            config_variations[idx]['glass']['glass_distance'] = 0.5 #1.6 #self.rand_float(0.05 * m, 0.09 * m) + (dim_x + 4) * water_radius / 2.
+            config_variations[idx]['glass']['poured_border'] = 0.02
 
             self.set_scene(config_variations[idx])
             init_state = copy.deepcopy(self.get_state())
@@ -187,16 +181,18 @@ class PourWaterPosControlEnv(FluidEnv):
 
     def initialize_camera(self):
         self.camera_params = {
-            'default_camera': {'pos': np.array([1.4, 1.5, 0.1]),
-                               'angle': np.array([0.45 * np.pi, -60 / 180. * np.pi, 0]),
+            'default_camera': {'pos': np.array([-0.1, 0.9, 3.15]),
+                               'angle': np.array([0.00 * np.pi, -20 / 180. * np.pi, 0]),
+                               #'angle': np.array([0.45 * np.pi, -60 / 180. * np.pi, 0]),
                                'width': self.camera_width,
                                'height': self.camera_height},
 
-            'cam_2d': {'pos': np.array([0.5, .7, 4.]),
+            'cam_2d': {'pos': np.array([0.5, 2.7, 2.]),
                        'angle': np.array([0, 0, 0.]),
                        'width': self.camera_width,
                        'height': self.camera_height}
         }
+        self.camera_params["cam_2d"] = self.camera_params["default_camera"]
 
     def set_poured_glass_params(self, config):
         params = config
@@ -206,8 +202,8 @@ class PourWaterPosControlEnv(FluidEnv):
         self.poured_height = params['poured_height']
 
         fluid_radis = self.fluid_params['radius'] * self.fluid_params['rest_dis_coef']
-        self.poured_glass_dis_x = self.fluid_params['dim_x'] * fluid_radis + 0.07  # glass floor length
-        self.poured_glass_dis_z = self.fluid_params['dim_z'] * fluid_radis + 0.07  # glass width
+        self.poured_glass_dis_x = self.fluid_params['dim_x'] * fluid_radis + 0.12  # glass floor length
+        self.poured_glass_dis_z = self.fluid_params['dim_z'] * fluid_radis + 0.28  # glass width
 
         params['poured_glass_dis_x'] = self.poured_glass_dis_x
         params['poured_glass_dis_z'] = self.poured_glass_dis_z
@@ -258,6 +254,7 @@ class PourWaterPosControlEnv(FluidEnv):
         # create pouring glass & poured glass
         self.create_glass(self.glass_dis_x, self.glass_dis_z, self.height, self.border)
         self.create_glass(self.poured_glass_dis_x, self.poured_glass_dis_z, self.poured_height, self.poured_border)
+        self.create_plant()
 
         # move pouring glass to be at ground
         self.glass_states = self.init_glass_state(self.x_center, 0, self.glass_dis_x, self.glass_dis_z, self.height, self.border)
@@ -265,8 +262,15 @@ class PourWaterPosControlEnv(FluidEnv):
         # move poured glass to be at ground
         self.poured_glass_states = self.init_glass_state(self.x_center + self.glass_distance, 0,
                                                          self.poured_glass_dis_x, self.poured_glass_dis_z, self.poured_height, self.poured_border)
+        self.plant_states = np.zeros((2, self.dim_shape_state))
+        self.plant_states[0, :3] = np.array([0.28, 0*self.stem_height/2, 0.])
+        self.plant_states[0, 3:6] = np.array([0.28, 0*self.stem_height/2, 0.])
+        self.plant_states[1, :3] = np.array([0.28, self.stem_height/2, 0.])
+        self.plant_states[1,3:6] = self.plant_states[1,:3]
+        quat = quatFromAxisAngle([0, 0, -1.], 0.05)
+        self.plant_states[:, 6:10] = quat
 
-        self.set_shape_states(self.glass_states, self.poured_glass_states)
+        self.set_shape_states(self.glass_states, self.poured_glass_states, self.plant_states)
 
         # record glass floor center x, y, and rotation
         self.glass_x = self.x_center
@@ -315,7 +319,7 @@ class PourWaterPosControlEnv(FluidEnv):
             not_in_glass = 1 - in_glass
             not_total_num = np.sum(not_in_glass)
 
-            while not_total_num > 0:
+            while False and not_total_num > 0:
                 max_height_now = np.max(water_state[:, 1])
                 fluid_dis = np.array([1.0 * fluid_radius, fluid_radius * 1, 1.0 * fluid_radius])
                 lower_x = self.glass_params['glass_x_center'] - self.glass_params['glass_dis_x'] / 4
@@ -349,30 +353,20 @@ class PourWaterPosControlEnv(FluidEnv):
         '''
         return the observation based on the current flex state.
         '''
-        if self.observation_mode == 'cam_rgb':
-            return self.get_image(self.camera_width, self.camera_height)
-        elif self.observation_mode == 'point_cloud':
-            particle_pos = np.array(pyflex.get_positions()).reshape([-1, 4])[:, :3].flatten()
-            pos = np.zeros(shape=self.particle_obs_dim, dtype=np.float)
-            pos[:len(particle_pos)] = particle_pos
-            return pos.flatten()
-        elif 'key_point' in self.observation_mode:
-            pos = np.empty(0, dtype=np.float)
+        pos = np.empty(0, dtype=np.float)
 
-            water_state = pyflex.get_positions().reshape([-1, 4])
-            in_poured_glass = self.in_glass(water_state, self.poured_glass_states, self.poured_border, self.poured_height)
-            in_control_glass = self.in_glass(water_state, self.glass_states, self.border, self.height)
-            in_poured_glass = float(np.sum(in_poured_glass)) / len(water_state)
-            in_control_glass = float(np.sum(in_control_glass)) / len(water_state)
+        water_state = pyflex.get_positions().reshape([-1, 4])
+        in_poured_glass = self.in_glass(water_state, self.poured_glass_states, self.poured_border, self.poured_height)
+        in_control_glass = self.in_glass(water_state, self.glass_states, self.border, self.height)
+        in_poured_glass = float(np.sum(in_poured_glass)) / len(water_state)
+        in_control_glass = float(np.sum(in_control_glass)) / len(water_state)
 
-            cup_state = np.array([self.glass_x, self.glass_y, self.glass_rotation, self.glass_dis_x, self.glass_dis_z, self.height,
-                                self.glass_distance + self.glass_x, self.poured_height, self.poured_glass_dis_x, self.poured_glass_dis_z,
-                                self._get_current_water_height(), in_poured_glass, in_control_glass])
+        cup_state = np.array([self.glass_x, self.glass_y, self.glass_rotation, self.glass_dis_x, self.glass_dis_z, self.height,
+                            self.glass_distance + self.glass_x, self.poured_height, self.poured_glass_dis_x, self.poured_glass_dis_z,
+                            self._get_current_water_height(), in_poured_glass, in_control_glass])
+        vector_state = np.hstack([pos, cup_state]).flatten()
 
-            return np.hstack([pos, cup_state]).flatten()
-        
-        else:
-            raise NotImplementedError
+        return vector_state, water_state
 
     def compute_reward(self, obs=None, action=None, set_prev_reward=False):
         """
@@ -426,7 +420,7 @@ class PourWaterPosControlEnv(FluidEnv):
         # check if the movement of the pouring glass collide with the poured glass.
         # the action only take effects if there is no collision
         new_states = self.rotate_glass(self.glass_states, x, y, theta)
-        if not self.judge_glass_collide(new_states, theta) and self.above_floor(new_states, theta):
+        if True and not self.judge_glass_collide(new_states, theta) and self.above_floor(new_states, theta):
             self.glass_states = new_states
             self.glass_x, self.glass_y, self.glass_rotation = x, y, theta
         else:  # invalid move, old state becomes the same as the current state
@@ -434,7 +428,7 @@ class PourWaterPosControlEnv(FluidEnv):
             self.glass_states[:, 10:] = self.glass_states[:, 6:10].copy()
 
         # pyflex takes a step to update the glass and the water fluid
-        self.set_shape_states(self.glass_states, self.poured_glass_states)
+        self.set_shape_states(self.glass_states, self.poured_glass_states, self.plant_states)
         pyflex.step(render=True)
 
         self.inner_step += 1
@@ -479,7 +473,21 @@ class PourWaterPosControlEnv(FluidEnv):
             center = boxes[i][1]
             quat = boxes[i][2]
             pyflex.add_box(halfEdge, center, quat)
+        return boxes
 
+    def create_plant(self):
+        quat = quatFromAxisAngle([0, 0, -1.], 0)
+        self.stem_height = 0.8
+        #halfEdge = np.array([stem_height/2, stem_height/2, stem_height/2])
+        halfEdgeStem = np.array([0.01, self.stem_height/2, 0.01])
+        leafHalfEdge = np.array([0.2, 0.02, 0.2])
+        center = np.array([0.0,0.0,0.0])
+        leaf_center = np.array([0.0,-0.0,0.0])
+        pyflex.add_box(halfEdgeStem, center, quat)
+        pyflex.add_box(leafHalfEdge, leaf_center, quat)
+        #pyflex.add_box(*one_box)
+        
+        boxes = []
         return boxes
 
     def rotate_glass(self, prev_states, x, y, theta):
@@ -592,11 +600,12 @@ class PourWaterPosControlEnv(FluidEnv):
 
         return states
 
-    def set_shape_states(self, glass_states, poured_glass_states):
+    def set_shape_states(self, glass_states, poured_glass_states, plant_state):
         '''
         set the the shape states of both glasses.
         '''
-        all_states = np.concatenate((glass_states, poured_glass_states), axis=0)
+        #all_states = np.concatenate((glass_states, poured_glass_states, plant_state), axis=0)
+        all_states = np.concatenate((glass_states, poured_glass_states, plant_state), axis=0)
         pyflex.set_shape_states(all_states)
 
     def in_glass(self, water, glass_states, border, height):
