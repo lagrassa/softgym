@@ -8,6 +8,7 @@ class FluidEnv(FlexEnv):
 
     def __init__(self, render_mode='particle', **kwargs):
         self.debug = False
+        render_mode="particle"
         assert render_mode in ['particle', 'fluid']
         self.render_mode = 0 if render_mode == 'particle' else 1
         super().__init__(**kwargs)
