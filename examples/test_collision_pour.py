@@ -65,16 +65,8 @@ def main():
     actions = []
     for i in range(2):
         actions.append(np.array([0, 0.08, 0]))
-    for i in range(5):
-        actions.append(np.array([-0.08, 0.0, 0]))
-    for i in range(5):
-        actions.append(np.array([0, 0.1, 0]))
-    for i in range(5):
-        actions.append(np.array([0.08, 0.0, 0]))
-    for i in range(8):
-        actions.append(np.array([0, 0.0, 0.3]))
-    for i in range(14):
-        actions.append(np.array([0, 0.0, 0.02]))
+    for i in range(45):
+        actions.append(np.array([0.01, 0.0, 0]))
     env.horizon = len(actions)
     for i in range(env.horizon):
         action = actions[i]

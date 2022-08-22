@@ -239,6 +239,7 @@ class PourWaterPosControlEnv(FluidEnv):
         # create fluid
         super().set_scene(config)  # do not sample fluid parameters, as it's very likely to generate very strange fluid
 
+        self.fcl_objects_by_id = {}
         # compute glass params
         if states is None:
             self.set_pouring_glass_params(config["glass"])
@@ -266,6 +267,7 @@ class PourWaterPosControlEnv(FluidEnv):
         # move pouring glass to be at ground
         self.glass_states = self.init_glass_state(self.x_center, 0, self.glass_dis_x, self.glass_dis_z, self.height, self.border)
 
+
         # move poured glass to be at ground
         self.poured_glass_states = self.init_glass_state(self.x_center + self.glass_distance, 0,
                                                          self.poured_glass_dis_x, self.poured_glass_dis_z, self.poured_height, self.poured_border)
@@ -280,6 +282,9 @@ class PourWaterPosControlEnv(FluidEnv):
             self.plant_states[:, 6:10] = quat
 
         self.set_shape_states(self.glass_states, self.poured_glass_states, self.plant_states)
+        self.set_collision_shape_states(self.glass_states, "pourer")
+        self.set_collision_shape_states(self.poured_glass_states, "poured")
+        self.set_collision_shape_states(self.plant_states, "plant")
 
         # record glass floor center x, y, and rotation
         self.glass_x = self.x_center
@@ -438,6 +443,9 @@ class PourWaterPosControlEnv(FluidEnv):
 
         # pyflex takes a step to update the glass and the water fluid
         self.set_shape_states(self.glass_states, self.poured_glass_states, self.plant_states)
+        self.set_collision_shape_states(self.glass_states, "pourer")
+        self.set_collision_shape_states(self.poured_glass_states, "poured")
+        self.set_collision_shape_states(self.plant_states, "plant")
         pyflex.step(render=True)
 
         self.inner_step += 1
@@ -501,6 +509,7 @@ class PourWaterPosControlEnv(FluidEnv):
             result = fcl.CollisionResult()
             ret = fcl.collide(prim1, prim2, request, result)
             if ret:
+                import ipdb; ipdb.set_trace()
                 return True
         return False
 
@@ -640,6 +649,17 @@ class PourWaterPosControlEnv(FluidEnv):
         #all_states = np.concatenate((glass_states, poured_glass_states, plant_state), axis=0)
         all_states = np.concatenate((glass_states, poured_glass_states, plant_state), axis=0)
         pyflex.set_shape_states(all_states)
+
+    def set_collision_shape_states(self, states, obj_idx):
+        fcl_objects = self.fcl_objects_by_id[obj_idx]
+        #remember: pyflex uses xyzw and fcl uses wxyz
+        for state_row, fcl_obj in zip(states, fcl_objects):
+            pos = state_row[:3]
+            quat_xyzw = state_row[6:10]
+            quat_wxyz = np.hstack([quat_xyzw[-1], quat_xyzw[:-1]]).flatten()
+            new_tf = fcl.Transform(quat_wxyz, pos)
+            fcl_obj.setTransform(new_tf)
+
 
     def in_glass(self, water, glass_states, border, height):
         '''
