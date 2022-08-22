@@ -2,10 +2,12 @@ import numpy as np
 from gym.spaces import Box
 
 import pyflex
+import itertools
 from softgym.envs.fluid_env import FluidEnv
 import copy
 from softgym.utils.misc import rotate_rigid_object, quatFromAxisAngle
 from shapely.geometry import Polygon
+import fcl
 import random, math
 
 
@@ -25,6 +27,7 @@ class PourWaterPosControlEnv(FluidEnv):
             cached_states_path = 'pour_water_init_states_top.pkl'
 
         self.observation_mode = observation_mode
+        self.fcl_objects_by_id = {}
         self.inner_step = 0
         self.performance_init = False
         self.action_mode = action_mode
@@ -254,8 +257,8 @@ class PourWaterPosControlEnv(FluidEnv):
             self.glass_params = glass_params
 
         # create pouring glass & poured glass
-        self.create_glass(self.glass_dis_x, self.glass_dis_z, self.height, self.border)
-        self.create_glass(self.poured_glass_dis_x, self.poured_glass_dis_z, self.poured_height, self.poured_border)
+        self.create_glass(self.glass_dis_x, self.glass_dis_z, self.height, self.border, "pourer")
+        self.create_glass(self.poured_glass_dis_x, self.poured_glass_dis_z, self.poured_height, self.poured_border, "poured")
         self.plant = True
         if self.plant:
             self.create_plant()
@@ -439,7 +442,7 @@ class PourWaterPosControlEnv(FluidEnv):
 
         self.inner_step += 1
 
-    def create_glass(self, glass_dis_x, glass_dis_z, height, border):
+    def create_glass(self, glass_dis_x, glass_dis_z, height, border, obj_id="generic_glass"):
         """
         the glass is a box, with each wall of it being a very thin box in Flex.
         each wall of the real box is represented by a box object in Flex with really small thickness (determined by the param border)
@@ -479,7 +482,28 @@ class PourWaterPosControlEnv(FluidEnv):
             center = boxes[i][1]
             quat = boxes[i][2]
             pyflex.add_box(halfEdge, center, quat)
+            self.add_collision_box(halfEdge, center, quat, obj_id)
         return boxes
+
+    def add_collision_box(self, halfEdge, center, quat, obj_id):
+        #Adds a collision box to the cache
+        if obj_id not in self.fcl_objects_by_id:
+            self.fcl_objects_by_id[obj_id] = []
+        fcl_object = make_fcl_box(halfEdge, center, quat)
+        self.fcl_objects_by_id[obj_id].append(fcl_object)
+        
+    def in_collision(self, idx1, idx2):
+        obj1 = self.fcl_objects_by_id[idx1]
+        obj2 = self.fcl_objects_by_id[idx2] #represent collision shapes of 
+        #complex objects using a list of their primitives
+        for prim1, prim2 in itertools.product(obj1, obj2):
+            request = fcl.CollisionRequest()
+            result = fcl.CollisionResult()
+            ret = fcl.collide(prim1, prim2, request, result)
+            if ret:
+                return True
+        return False
+
 
     def create_plant(self):
         quat = quatFromAxisAngle([0, 0, -1.], 0)
@@ -491,10 +515,13 @@ class PourWaterPosControlEnv(FluidEnv):
         leaf_center = center #np.array([0.0,-0.0,0.0])
         pyflex.add_box(halfEdgeStem, center, quat)
         pyflex.add_box(leafHalfEdge, leaf_center, quat)
+        self.add_collision_box(halfEdgeStem, center, quat, "plant")
+        self.add_collision_box(leafHalfEdge, leaf_center, quat, "plant")
         #pyflex.add_box(*one_box)
         
         boxes = []
         return boxes
+
 
     def rotate_glass(self, prev_states, x, y, theta):
         '''
@@ -703,3 +730,12 @@ class PourWaterPosControlEnv(FluidEnv):
                 return False
 
         return True
+
+def make_fcl_box(halfEdge, center, quat):
+    """
+    Makes a fcl collision object with the dimensions specified by halfEdge with the coordinates specified by center and quat
+    """
+    box = fcl.Box(*halfEdge)
+    pos = center
+    tf = fcl.Transform(quat, pos) #yes, checked, this is the correct way to do this
+    return fcl.CollisionObject(box, tf)
