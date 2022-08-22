@@ -509,7 +509,6 @@ class PourWaterPosControlEnv(FluidEnv):
             result = fcl.CollisionResult()
             ret = fcl.collide(prim1, prim2, request, result)
             if ret:
-                import ipdb; ipdb.set_trace()
                 return True
         return False
 
@@ -656,7 +655,7 @@ class PourWaterPosControlEnv(FluidEnv):
         for state_row, fcl_obj in zip(states, fcl_objects):
             pos = state_row[:3]
             quat_xyzw = state_row[6:10]
-            quat_wxyz = np.hstack([quat_xyzw[-1], quat_xyzw[:-1]]).flatten()
+            quat_wxyz = wxyz_fcl_from_xyzw_pyflex(quat_xyzw)
             new_tf = fcl.Transform(quat_wxyz, pos)
             fcl_obj.setTransform(new_tf)
 
@@ -751,11 +750,16 @@ class PourWaterPosControlEnv(FluidEnv):
 
         return True
 
-def make_fcl_box(halfEdge, center, quat):
+def make_fcl_box(halfEdge, center, quat_xyzw):
     """
     Makes a fcl collision object with the dimensions specified by halfEdge with the coordinates specified by center and quat
     """
     box = fcl.Box(*halfEdge)
     pos = center
-    tf = fcl.Transform(quat, pos) #yes, checked, this is the correct way to do this
+    quat_wxyz = wxyz_fcl_from_xyzw_pyflex(quat_xyzw)
+    tf = fcl.Transform(quat_wxyz, pos) #yes, checked, this is the correct way to do this
     return fcl.CollisionObject(box, tf)
+
+def wxyz_fcl_from_xyzw_pyflex(quat_xyzw):
+    quat_wxyz = np.hstack([quat_xyzw[-1], quat_xyzw[:-1]]).flatten()
+    return quat_wxyz
