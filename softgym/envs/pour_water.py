@@ -69,7 +69,7 @@ class PourWaterPosControlEnv(FluidEnv):
                 'radius': 0.033,
                 'rest_dis_coef': 0.55,
                 'cohesion': 0.1,  # not actually used, instead, is computed as viscosity * 0.01
-                'viscosity': 0.1,
+                'viscosity': 3.1,
                 'surfaceTension': 0,
                 'adhesion': 0.0,  # not actually used, instead, is computed as viscosity * 0.001
                 'vorticityConfinement': 40,
@@ -83,7 +83,7 @@ class PourWaterPosControlEnv(FluidEnv):
                 'height': 0.6,
                 'glass_distance': 1.0,
                 'poured_border': 0.04,
-                'poured_height': 0.6,
+                'poured_height': 0.5,
             },
             'camera_name': 'default_camera',
         }
@@ -119,7 +119,7 @@ class PourWaterPosControlEnv(FluidEnv):
             # config_variations[idx]['fluid']['viscosity'] = self.rand_float(2.0, 10.0)
 
             config_variations[idx]['glass']['height'] = glass_height
-            config_variations[idx]['glass']['poured_height'] = glass_height + 0.2 * 0.1 #remove random
+            config_variations[idx]['glass']['poured_height'] = glass_height - 0.03 #remove random
             config_variations[idx]['glass']['glass_distance'] = 0.5 #1.6 #self.rand_float(0.05 * m, 0.09 * m) + (dim_x + 4) * water_radius / 2.
             config_variations[idx]['glass']['poured_border'] = 0.02
 
@@ -204,7 +204,7 @@ class PourWaterPosControlEnv(FluidEnv):
         self.poured_height = params['poured_height']
 
         fluid_radis = self.fluid_params['radius'] * self.fluid_params['rest_dis_coef']
-        self.poured_glass_dis_x = self.fluid_params['dim_x'] * fluid_radis + 0.12  # glass floor length
+        self.poured_glass_dis_x = self.fluid_params['dim_x'] * fluid_radis + 0.26  # glass floor length
         self.poured_glass_dis_z = self.fluid_params['dim_z'] * fluid_radis + 0.28  # glass width
 
         params['poured_glass_dis_x'] = self.poured_glass_dis_x
@@ -256,7 +256,7 @@ class PourWaterPosControlEnv(FluidEnv):
         # create pouring glass & poured glass
         self.create_glass(self.glass_dis_x, self.glass_dis_z, self.height, self.border)
         self.create_glass(self.poured_glass_dis_x, self.poured_glass_dis_z, self.poured_height, self.poured_border)
-        self.plant = False
+        self.plant = True
         if self.plant:
             self.create_plant()
 
@@ -267,10 +267,11 @@ class PourWaterPosControlEnv(FluidEnv):
         self.poured_glass_states = self.init_glass_state(self.x_center + self.glass_distance, 0,
                                                          self.poured_glass_dis_x, self.poured_glass_dis_z, self.poured_height, self.poured_border)
         self.plant_states = np.zeros((2, self.dim_shape_state))
+        x_plant = 0.7
         if self.plant:
-            self.plant_states[0, :3] = np.array([0.28, 0*self.stem_height/2, 0.])
-            self.plant_states[0, 3:6] = np.array([0.28, 0*self.stem_height/2, 0.])
-            self.plant_states[1, :3] = np.array([0.28, self.stem_height/2, 0.])
+            self.plant_states[0, :3] = np.array([x_plant, 0*self.stem_height/2, 0.])
+            self.plant_states[0, 3:6] = self.plant_states[0, :3] #np.array([0.28, 0*self.stem_height/2, 0.])
+            self.plant_states[1, :3] = np.array([x_plant, self.stem_height/2, 0.])
             self.plant_states[1,3:6] = self.plant_states[1,:3]
             quat = quatFromAxisAngle([0, 0, -1.], 0.05)
             self.plant_states[:, 6:10] = quat
@@ -482,12 +483,12 @@ class PourWaterPosControlEnv(FluidEnv):
 
     def create_plant(self):
         quat = quatFromAxisAngle([0, 0, -1.], 0)
-        self.stem_height = 0.8
+        self.stem_height = 0.45
         #halfEdge = np.array([stem_height/2, stem_height/2, stem_height/2])
         halfEdgeStem = np.array([0.01, self.stem_height/2, 0.01])
-        leafHalfEdge = np.array([0.2, 0.02, 0.2])
+        leafHalfEdge = np.array([0.3, 0.02, 0.3])
         center = np.array([0.0,0.0,0.0])
-        leaf_center = np.array([0.0,-0.0,0.0])
+        leaf_center = center #np.array([0.0,-0.0,0.0])
         pyflex.add_box(halfEdgeStem, center, quat)
         pyflex.add_box(leafHalfEdge, leaf_center, quat)
         #pyflex.add_box(*one_box)
