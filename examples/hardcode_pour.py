@@ -3,6 +3,11 @@ import argparse
 import numpy as np
 np.random.seed(0)
 
+import torch
+import tensorflow
+foo = torch.Tensor([4.])
+foo.cuda()
+
 from softgym.registered_env import env_arg_dict, SOFTGYM_ENVS
 from softgym.utils.normalized_env import normalize
 from softgym.utils.visualization import save_numpy_as_gif
@@ -31,7 +36,7 @@ def show_depth():
 def main():
     parser = argparse.ArgumentParser(description='Process some integers.')
     # ['PassWater', 'PourWater', 'PourWaterAmount', 'RopeFlatten', 'ClothFold', 'ClothFlatten', 'ClothDrop', 'ClothFoldCrumpled', 'ClothFoldDrop', 'RopeConfiguration']
-    parser.add_argument('--env_name', type=str, default='ClothDrop')
+    parser.add_argument('--env_name', type=str, default='PourWaterPlant')
     parser.add_argument('--headless', type=int, default=0, help='Whether to run the environment with headless rendering')
     parser.add_argument('--num_variations', type=int, default=1, help='Number of environment variations to be generated')
     parser.add_argument('--save_video_dir', type=str, default='./data/', help='Path to the saved video')
@@ -58,34 +63,46 @@ def main():
     point_dataset = None
     vector_dataset = None
     actions = []
-    for i in range(2):
-        actions.append(np.array([0, 0.08, 0]))
-    for i in range(5):
-        actions.append(np.array([-0.08, 0.0, 0]))
-    for i in range(5):
-        actions.append(np.array([0, 0.1, 0]))
-    for i in range(5):
-        actions.append(np.array([0.08, 0.0, 0]))
-    for i in range(8):
-        actions.append(np.array([0, 0.0, 0.3]))
-    for i in range(14):
-        actions.append(np.array([0, 0.0, 0.02]))
+    low_pour = True
+    if low_pour:
+        for i in range(6):
+            actions.append(np.array([0, -0.05, 0]))
+        for i in range(5):
+            actions.append(np.array([0.04, 0.0, 0]))
+        for i in range(5):
+            actions.append(np.array([0.04, 0.0, 0]))
+        for i in range(8):
+            actions.append(np.array([0, 0.0, 0.4]))
+        for i in range(14):
+            actions.append(np.array([0, 0.0, 0.02]))
+    if not low_pour:
+        for i in range(10):
+            actions.append(np.array([0, 0.08, 0]))
+        for i in range(5):
+            actions.append(np.array([0.04, 0.0, 0]))
+        for i in range(5):
+            actions.append(np.array([0.04, 0.0, 0]))
+        for i in range(8):
+            actions.append(np.array([0, 0.0, 0.4]))
+        for i in range(14):
+            actions.append(np.array([0, 0.0, 0.02]))
     env.horizon = len(actions)
     for i in range(env.horizon):
         action = actions[i]
         # By default, the environments will apply action repitition. The option of record_continuous_video provides rendering of all
         # intermediate frames. Only use this option for visualization as it increases computation.
-        data = env.step(action, record_continuous_video=True, img_size=args.img_size)
+        data = env.step(action, record_continuous_video=False, img_size=args.img_size)
         if point_dataset is None:
-            vector_dataset = np.zeros((env.horizon, 7))
+            vector_dataset = np.zeros((env.horizon, 13))
             point_dataset = np.zeros((env.horizon,data[0][1].shape[0], 4))
         _, _, _, info = data
         #dataset.append(data[0])
         #point_dataset[i, :]  = data[0][1]
-        #vector_dataset[i]  = data[0][0]
-        frames.extend(info['flex_env_recorded_frames'])
+        vector_dataset[i]  = data[0][0]
+        #frames.extend(info['flex_env_recorded_frames'])
         if args.test_depth:
             show_depth()
+    import ipdb; ipdb.set_trace()
     np.save("data/pass_water_vector_dataset.npy", vector_dataset)
     np.save("data/pass_water_point_dataset.npy", point_dataset)
     if args.save_video_dir is not None:

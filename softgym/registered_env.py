@@ -1,4 +1,5 @@
 from softgym.envs.pour_water import PourWaterPosControlEnv
+from softgym.envs.pour_water_new import PourWaterPlantPosControlEnv
 from softgym.envs.pour_water_amount import PourWaterAmountPosControlEnv
 from softgym.envs.pass_water import PassWater1DEnv
 from softgym.envs.rope_flatten import RopeFlattenEnv
@@ -13,6 +14,17 @@ from collections import OrderedDict
 
 env_arg_dict = {
     'PourWater': {'observation_mode': 'cam_rgb',
+                  'action_mode': 'rotation_bottom',
+                  'render_mode': 'fluid',
+                  'deterministic': False,
+                  'render': True,
+                  'action_repeat': 8,
+                  'headless': True,
+                  'num_variations': 1000,
+                  'horizon': 100,
+                  'use_cached_states': True,
+                  'camera_name': 'default_camera'},
+    'PourWaterPlant': {'observation_mode': 'cam_rgb',
                   'action_mode': 'rotation_bottom',
                   'render_mode': 'fluid',
                   'deterministic': False,
@@ -182,6 +194,7 @@ env_arg_dict = {
 
 SOFTGYM_ENVS = OrderedDict({
     'PourWater': PourWaterPosControlEnv,
+    'PourWaterPlant': PourWaterPlantPosControlEnv,
     'PourWaterAmount': PourWaterAmountPosControlEnv,
     'PassWater': PassWater1DEnv,
     'ClothFlatten': ClothFlattenEnv,
