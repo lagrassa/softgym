@@ -285,7 +285,8 @@ class PourWaterPlantPosControlEnv(FluidEnv):
         self.set_shape_states(self.glass_states, self.poured_glass_states, self.plant_states)
         self.set_collision_shape_states(self.glass_states, "pourer")
         self.set_collision_shape_states(self.poured_glass_states, "poured")
-        self.set_collision_shape_states(self.plant_states, "plant")
+        if self.plant:
+            self.set_collision_shape_states(self.plant_states, "plant")
 
         # record glass floor center x, y, and rotation
         self.glass_x = self.x_center
@@ -447,7 +448,8 @@ class PourWaterPlantPosControlEnv(FluidEnv):
         self.set_shape_states(self.glass_states, self.poured_glass_states, self.plant_states)
         self.set_collision_shape_states(self.glass_states, "pourer")
         self.set_collision_shape_states(self.poured_glass_states, "poured")
-        self.set_collision_shape_states(self.plant_states, "plant")
+        if self.plant:
+            self.set_collision_shape_states(self.plant_states, "plant")
         pyflex.step(render=True)
 
         self.inner_step += 1
@@ -520,6 +522,8 @@ class PourWaterPlantPosControlEnv(FluidEnv):
         tf = fcl.Transform(center)
         sphere = fcl.CollisionObject(sphere_shape, tf)
         for obj_idx in obj_idxs:
+            if obj_idx not in self.fcl_objects_by_id:
+                continue
             for prim in self.fcl_objects_by_id[obj_idx]:
                 request = fcl.CollisionRequest()
                 result = fcl.CollisionResult()
@@ -529,7 +533,11 @@ class PourWaterPlantPosControlEnv(FluidEnv):
         return False
 
     def in_collision_sphere_premade(self, center, sphere, obj_idxs = []):
+        tf = fcl.Transform(center)
+        sphere.setTransform(tf)
         for obj_idx in obj_idxs:
+            if obj_idx not in self.fcl_objects_by_id:
+                continue 
             for prim in self.fcl_objects_by_id[obj_idx]:
                 request = fcl.CollisionRequest()
                 result = fcl.CollisionResult()
