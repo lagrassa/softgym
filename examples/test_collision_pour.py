@@ -73,7 +73,12 @@ def main():
         # By default, the environments will apply action repitition. The option of record_continuous_video provides rendering of all
         # intermediate frames. Only use this option for visualization as it increases computation.
         data = env.step(action, record_continuous_video=True, img_size=args.img_size)
+        print(i)
         print(env.in_collision("pourer", "plant"))
+        if i >= 35:
+            import ipdb; ipdb.set_trace()
+            env.in_collision("pourer", "plant")
+
         if point_dataset is None:
             vector_dataset = np.zeros((env.horizon, 7))
             point_dataset = np.zeros((env.horizon,data[0][1].shape[0], 4))

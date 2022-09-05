@@ -72,7 +72,7 @@ class PourWaterPlantPosControlEnv(FluidEnv):
                 'radius': 0.033,
                 'rest_dis_coef': 0.55,
                 'cohesion': 0.1,  # not actually used, instead, is computed as viscosity * 0.01
-                'viscosity': 3.1,
+                'viscosity': 9.1, #3.1 originally
                 'surfaceTension': 0,
                 'adhesion': 0.0,  # not actually used, instead, is computed as viscosity * 0.001
                 'vorticityConfinement': 40,
@@ -192,10 +192,10 @@ class PourWaterPlantPosControlEnv(FluidEnv):
                                'width': self.camera_width,
                                'height': self.camera_height},
 
-            'cam_2d': {'pos': np.array([0.5, 2.7, 2.]),
+            'cam_2d': {'pos': np.array([0.5, 2.7, 2.]), #np.array([0.5, 2.7, 2.]),
                        'angle': np.array([0, 0, 0.]),
                        'width': self.camera_width,
-                       'height': self.camera_height}
+                      'height': self.camera_height}
         }
         self.camera_params["cam_2d"] = self.camera_params["default_camera"]
 
@@ -261,8 +261,10 @@ class PourWaterPlantPosControlEnv(FluidEnv):
         self.create_glass(self.glass_dis_x, self.glass_dis_z, self.height, self.border, "pourer")
         self.create_glass(self.poured_glass_dis_x, self.poured_glass_dis_z, self.poured_height, self.poured_border, "poured")
         self.plant = True
+        num_plant_boxes = 2
         if self.plant:
-            self.create_plant()
+            plant_box_centers = self.create_plant()
+            num_plant_boxes = 1 + len(plant_box_centers)
 
         # move pouring glass to be at ground
         self.starting_pourer_height = 0.6
@@ -272,16 +274,26 @@ class PourWaterPlantPosControlEnv(FluidEnv):
         # move poured glass to be at ground
         self.poured_glass_states = self.init_glass_state(self.x_center + self.glass_distance, 0,
                                                          self.poured_glass_dis_x, self.poured_glass_dis_z, self.poured_height, self.poured_border)
-        self.plant_states = np.zeros((2, self.dim_shape_state))
-        x_plant = 0.7
+        self.plant_states = np.zeros((num_plant_boxes, self.dim_shape_state))
+        x_plant = 0.64
+        quat = quatFromAxisAngle([0, 0, -1.], 0.0)
+        scaling = 1.0
         if self.plant:
-            self.plant_states[0, :3] = np.array([x_plant, 0*self.stem_height/2, 0.])
-            self.plant_states[0, 3:6] = self.plant_states[0, :3] #np.array([0.28, 0*self.stem_height/2, 0.])
-            self.plant_states[1, :3] = np.array([x_plant, self.stem_height/2, 0.])
-            self.plant_states[1,3:6] = self.plant_states[1,:3]
-            quat = quatFromAxisAngle([0, 0, -1.], 0.0)
-            self.plant_states[:, 6:10] = quat
+            if num_plant_boxes == 2:
+                #umbrellaplant legacy code
+                self.plant_states[0, :3] = np.array([x_plant, 0*self.stem_height/2, 0.])
+                self.plant_states[0, 3:6] = self.plant_states[0, :3] #np.array([0.28, 0*self.stem_height/2, 0.])
+                self.plant_states[1, :3] = np.array([x_plant, self.stem_height/2, 0.])
+                self.plant_states[1,3:6] = self.plant_states[1,:3]
+                self.plant_states[:, 6:10] = quat
+            else:
+                for i, center in enumerate(plant_box_centers):
+                    #self.plant_states[i, :3] = np.array([center[0], center[1] + self.stem_height/2, center[2]])
+                    self.plant_states[i, :3] = scaling*np.array([x_plant + center[0], center[1], center[2]])
+                    self.plant_states[i,3:6] = self.plant_states[i,:3]
+                    self.plant_states[:, 6:10] = quat
 
+        
         self.set_shape_states(self.glass_states, self.poured_glass_states, self.plant_states)
         self.set_collision_shape_states(self.glass_states, "pourer")
         self.set_collision_shape_states(self.poured_glass_states, "poured")
@@ -448,7 +460,7 @@ class PourWaterPlantPosControlEnv(FluidEnv):
         self.set_shape_states(self.glass_states, self.poured_glass_states, self.plant_states)
         self.set_collision_shape_states(self.glass_states, "pourer")
         self.set_collision_shape_states(self.poured_glass_states, "poured")
-        if self.plant:
+        if False and self.plant:
             self.set_collision_shape_states(self.plant_states, "plant")
         pyflex.step(render=True)
 
@@ -547,8 +559,31 @@ class PourWaterPlantPosControlEnv(FluidEnv):
         return False
 
 
-
     def create_plant(self):
+        quat = quatFromAxisAngle([0, 0, -1.], 0)
+        self.stem_height = 1.00
+        #halfEdge = np.array([stem_height/2, stem_height/2, stem_height/2])
+        halfEdgeStem = np.array([0.01, self.stem_height/2, 0.01])
+        center = np.array([0.0,0.0,0.0])
+        #pyflex.add_box(halfEdgeStem, center, quat)
+        #self.add_collision_box(halfEdgeStem, center, quat, "plant")
+        saved_boxes = np.load("data/boxes_9_04.npy")
+        centers = []
+        scaling = 5.0
+        p_skip = 0.05
+        for box in saved_boxes:
+            if np.random.random() < p_skip:
+                continue
+            box[0] *= -1
+            center = scaling*box[:3]
+            facelength = box[-1] /1.28
+            leafHalfEdge = scaling*np.array([facelength, facelength, facelength])
+            centers.append(center)
+            pyflex.add_box(leafHalfEdge, np.array([0.0, 0.0, 0.0]), quat)
+            self.add_collision_box(leafHalfEdge, center, quat, "plant")
+        return centers
+
+    def create_umbrellaplant(self):
         quat = quatFromAxisAngle([0, 0, -1.], 0)
         self.stem_height = 1.00
         self.leaf_width = 0.4
