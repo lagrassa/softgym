@@ -8,6 +8,7 @@ import copy
 from softgym.utils.misc import rotate_rigid_object, quatFromAxisAngle
 from shapely.geometry import Polygon
 import fcl
+import os
 import random, math
 
 
@@ -567,7 +568,9 @@ class PourWaterPlantPosControlEnv(FluidEnv):
         center = np.array([0.0,0.0,0.0])
         #pyflex.add_box(halfEdgeStem, center, quat)
         #self.add_collision_box(halfEdgeStem, center, quat, "plant")
-        saved_boxes = np.load("data/boxes_9_04.npy")
+        path = os.environ["PYFLEXROOT"]
+        saved_boxes_fn = os.path.join(path, "../data/boxes_9_04.npy")
+        saved_boxes = np.load(saved_boxes_fn)
         centers = []
         scaling = 5.0
         p_skip = 0.05
