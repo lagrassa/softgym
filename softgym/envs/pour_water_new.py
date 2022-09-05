@@ -32,6 +32,7 @@ class PourWaterPlantPosControlEnv(FluidEnv):
         self.inner_step = 0
         self.performance_init = False
         self.action_mode = action_mode
+        self.plant_set = False #to avoid setting plant states multiple times
         self.wall_num = 5  # number of glass walls. floor/left/right/front/back
         super().__init__(**kwargs)
         self.get_cached_configs_and_states(cached_states_path, self.num_variations)
@@ -275,31 +276,32 @@ class PourWaterPlantPosControlEnv(FluidEnv):
         # move poured glass to be at ground
         self.poured_glass_states = self.init_glass_state(self.x_center + self.glass_distance, 0,
                                                          self.poured_glass_dis_x, self.poured_glass_dis_z, self.poured_height, self.poured_border)
-        self.plant_states = np.zeros((num_plant_boxes, self.dim_shape_state))
-        x_plant = 0.64
-        quat = quatFromAxisAngle([0, 0, -1.], 0.0)
-        scaling = 1.0
-        if self.plant:
-            if num_plant_boxes == 2:
-                #umbrellaplant legacy code
-                self.plant_states[0, :3] = np.array([x_plant, 0*self.stem_height/2, 0.])
-                self.plant_states[0, 3:6] = self.plant_states[0, :3] #np.array([0.28, 0*self.stem_height/2, 0.])
-                self.plant_states[1, :3] = np.array([x_plant, self.stem_height/2, 0.])
-                self.plant_states[1,3:6] = self.plant_states[1,:3]
-                self.plant_states[:, 6:10] = quat
-            else:
-                for i, center in enumerate(plant_box_centers):
-                    #self.plant_states[i, :3] = np.array([center[0], center[1] + self.stem_height/2, center[2]])
-                    self.plant_states[i, :3] = scaling*np.array([x_plant + center[0], center[1], center[2]])
-                    self.plant_states[i,3:6] = self.plant_states[i,:3]
+        if self.plant and not self.plant_set:
+            self.plant_states = np.zeros((num_plant_boxes, self.dim_shape_state))
+            x_plant = 0.64
+            quat = quatFromAxisAngle([0, 0, -1.], 0.0)
+            scaling = 1.0
+            if self.plant:
+                if num_plant_boxes == 2:
+                    #umbrellaplant legacy code
+                    self.plant_states[0, :3] = np.array([x_plant, 0*self.stem_height/2, 0.])
+                    self.plant_states[0, 3:6] = self.plant_states[0, :3] #np.array([0.28, 0*self.stem_height/2, 0.])
+                    self.plant_states[1, :3] = np.array([x_plant, self.stem_height/2, 0.])
+                    self.plant_states[1,3:6] = self.plant_states[1,:3]
                     self.plant_states[:, 6:10] = quat
+                else:
+                    for i, center in enumerate(plant_box_centers):
+                        #self.plant_states[i, :3] = np.array([center[0], center[1] + self.stem_height/2, center[2]])
+                        self.plant_states[i, :3] = scaling*np.array([x_plant + center[0], center[1], center[2]])
+                        self.plant_states[i,3:6] = self.plant_states[i,:3]
+                        self.plant_states[:, 6:10] = quat
+            self.set_collision_shape_states(self.plant_states, "plant")
+            self.plant_set = True
 
         
         self.set_shape_states(self.glass_states, self.poured_glass_states, self.plant_states)
         self.set_collision_shape_states(self.glass_states, "pourer")
         self.set_collision_shape_states(self.poured_glass_states, "poured")
-        if self.plant:
-            self.set_collision_shape_states(self.plant_states, "plant")
 
         # record glass floor center x, y, and rotation
         self.glass_x = self.x_center
@@ -551,6 +553,13 @@ class PourWaterPlantPosControlEnv(FluidEnv):
         for obj_idx in obj_idxs:
             if obj_idx not in self.fcl_objects_by_id:
                 continue 
+            if False and obj_idx == "plant":
+                request = fcl.CollisionRequest()
+                result = fcl.CollisionResult()
+                ret = fcl.collide(sphere, self.fcl_plant_bbox, request, result)
+                if not ret:
+                    continue #Doens't even collide with bbox
+                
             for prim in self.fcl_objects_by_id[obj_idx]:
                 request = fcl.CollisionRequest()
                 result = fcl.CollisionResult()
@@ -573,16 +582,22 @@ class PourWaterPlantPosControlEnv(FluidEnv):
         saved_boxes = np.load(saved_boxes_fn)
         centers = []
         scaling = 5.0
-        p_skip = 0.05
+        p_skip = 0.5
+        p_skip_collision = 0.8
+        max_x = -0.01
         for box in saved_boxes:
             if np.random.random() < p_skip:
                 continue
             box[0] *= -1
+            if box[0] > max_x:
+                continue #make physics more manageable
             center = scaling*box[:3]
-            facelength = box[-1] /1.28
+            facelength = box[-1] /1.1
             leafHalfEdge = scaling*np.array([facelength, facelength, facelength])
             centers.append(center)
             pyflex.add_box(leafHalfEdge, np.array([0.0, 0.0, 0.0]), quat)
+            if np.random.random() < p_skip_collision:
+                continue
             self.add_collision_box(leafHalfEdge, center, quat, "plant")
         return centers
 
@@ -727,12 +742,23 @@ class PourWaterPlantPosControlEnv(FluidEnv):
     def set_collision_shape_states(self, states, obj_idx):
         fcl_objects = self.fcl_objects_by_id[obj_idx]
         #remember: pyflex uses xyzw and fcl uses wxyz
+        poses = []
         for state_row, fcl_obj in zip(states, fcl_objects):
             pos = state_row[:3]
             quat_xyzw = state_row[6:10]
             quat_wxyz = wxyz_fcl_from_xyzw_pyflex(quat_xyzw)
             new_tf = fcl.Transform(quat_wxyz, pos)
             fcl_obj.setTransform(new_tf)
+            poses.append(pos)
+        if obj_idx == "plant":
+            poses_np = np.vstack(poses)
+            ranges = []
+            for i in range(3):
+                ranges.append((poses_np[:,i].min(), poses_np[:,i].max()))
+            ranges = np.vstack(ranges)
+            center = np.mean(ranges, axis=1)
+            halfEdge = (ranges[:,-1] - ranges[:,0])/2.
+            self.fcl_plant_bbox =  make_fcl_box(halfEdge, center, quat_xyzw)
 
 
     def in_glass(self, water, glass_states, border, height):
