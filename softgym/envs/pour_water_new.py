@@ -260,6 +260,7 @@ class PourWaterPlantPosControlEnv(FluidEnv):
             self.glass_params = glass_params
 
         # create pouring glass & poured glass
+        self.pourer_offset = -0.07
         self.create_glass(self.glass_dis_x, self.glass_dis_z, self.height, self.border, "pourer")
         self.create_glass(self.poured_glass_dis_x, self.poured_glass_dis_z, self.poured_height, self.poured_border, "poured")
         self.plant = True
@@ -270,7 +271,7 @@ class PourWaterPlantPosControlEnv(FluidEnv):
 
         # move pouring glass to be at ground
         self.starting_pourer_height = 0.6
-        self.glass_states = self.init_glass_state(self.x_center, self.starting_pourer_height, self.glass_dis_x, self.glass_dis_z, self.height, self.border)
+        self.glass_states = self.init_glass_state(self.x_center + self.pourer_offset, self.starting_pourer_height, self.glass_dis_x, self.glass_dis_z, self.height, self.border)
 
 
         # move poured glass to be at ground
@@ -304,7 +305,7 @@ class PourWaterPlantPosControlEnv(FluidEnv):
         self.set_collision_shape_states(self.poured_glass_states, "poured")
 
         # record glass floor center x, y, and rotation
-        self.glass_x = self.x_center
+        self.glass_x = self.x_center + self.pourer_offset
         if self.action_mode == 'rotation_bottom':
             self.glass_y = self.starting_pourer_height
         elif self.action_mode == 'rotation_top':
@@ -324,6 +325,7 @@ class PourWaterPlantPosControlEnv(FluidEnv):
             fluid_radius = self.fluid_params['radius'] * self.fluid_params['rest_dis_coef']
             fluid_dis = np.array([1.0 * fluid_radius, fluid_radius * 0.5, 1.0 * fluid_radius])
             lower_x = self.glass_params['glass_x_center'] - self.glass_params['glass_dis_x'] / 2. + self.glass_params['border']
+            lower_x += self.pourer_offset
             lower_z = -self.glass_params['glass_dis_z'] / 2 + self.glass_params['border']
             lower_y = self.glass_params['border']
             if self.action_mode in ['sawyer', 'franka']:
