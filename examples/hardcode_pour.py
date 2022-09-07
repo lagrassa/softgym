@@ -5,8 +5,6 @@ np.random.seed(0)
 
 import torch
 import tensorflow
-foo = torch.Tensor([4.])
-foo.cuda()
 
 from softgym.registered_env import env_arg_dict, SOFTGYM_ENVS
 from softgym.utils.normalized_env import normalize
@@ -36,7 +34,7 @@ def show_depth():
 def main():
     parser = argparse.ArgumentParser(description='Process some integers.')
     # ['PassWater', 'PourWater', 'PourWaterAmount', 'RopeFlatten', 'ClothFold', 'ClothFlatten', 'ClothDrop', 'ClothFoldCrumpled', 'ClothFoldDrop', 'RopeConfiguration']
-    parser.add_argument('--env_name', type=str, default='PourWater')
+    parser.add_argument('--env_name', type=str, default='PourWaterPlant')
     parser.add_argument('--headless', type=int, default=0, help='Whether to run the environment with headless rendering')
     parser.add_argument('--num_variations', type=int, default=1, help='Number of environment variations to be generated')
     parser.add_argument('--save_video_dir', type=str, default='./data/', help='Path to the saved video')
@@ -64,11 +62,15 @@ def main():
     vector_dataset = None
     actions = []
     low_pour = True
+    #for i in range(100000):
+    #    pyflex.render()
     if low_pour:
-        for i in range(6):
+        for i in range(4):
             actions.append(np.array([0.0,-0.07, 0]))
-        for i in range(6):
+        for i in range(7):
             actions.append(np.array([0.05,0, 0]))
+        for i in range(2):
+            actions.append(np.array([0.02,0, 0]))
         for i in range(8):
             actions.append(np.array([0, 0.0, 0.4]))
         for i in range(14):

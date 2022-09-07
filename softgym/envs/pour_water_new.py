@@ -12,6 +12,12 @@ import os
 import random, math
 
 
+def _get_min_x(fcl_objects):
+    xs = [fcl_object.getTranslation()[0] for fcl_object in fcl_objects]
+    return min(xs)
+
+
+
 class PourWaterPlantPosControlEnv(FluidEnv):
     def __init__(self, observation_mode, action_mode,
                  config=None, cached_states_path='pour_water_init_states.pkl', **kwargs):
@@ -71,7 +77,7 @@ class PourWaterPlantPosControlEnv(FluidEnv):
     def get_default_config(self):
         config = {
             'fluid': {
-                'radius': 0.033,
+                'radius': 0.033, #originally 0.033
                 'rest_dis_coef': 0.55,
                 'cohesion': 0.1,  # not actually used, instead, is computed as viscosity * 0.01
                 'viscosity': 9.1, #3.1 originally
@@ -225,8 +231,8 @@ class PourWaterPlantPosControlEnv(FluidEnv):
         self.height = params['height']
 
         fluid_radis = self.fluid_params['radius'] * self.fluid_params['rest_dis_coef']
-        self.glass_dis_x = self.fluid_params['dim_x'] * fluid_radis + 0.1   # glass floor length
-        self.glass_dis_z = self.fluid_params['dim_z'] * fluid_radis + 0.1  # glass width
+        self.glass_dis_x = self.fluid_params['dim_x'] * fluid_radis + 0.04   # glass floor length
+        self.glass_dis_z = self.fluid_params['dim_z'] * fluid_radis + 0.04  # glass width
 
         params['glass_dis_x'] = self.glass_dis_x
         params['glass_dis_z'] = self.glass_dis_z
@@ -241,7 +247,12 @@ class PourWaterPlantPosControlEnv(FluidEnv):
         # create fluid
         super().set_scene(config)  # do not sample fluid parameters, as it's very likely to generate very strange fluid
 
-        self.fcl_objects_by_id = {}
+        if "plant" in self.fcl_objects_by_id:
+            self.fcl_objects_by_id_old = self.fcl_objects_by_id
+            self.fcl_objects_by_id = {}
+            self.fcl_objects_by_id["plant"] = self.fcl_objects_by_id_old["plant"]
+        else:
+            self.fcl_objects_by_id = {}
         # compute glass params
         if states is None:
             self.set_pouring_glass_params(config["glass"])
@@ -263,11 +274,11 @@ class PourWaterPlantPosControlEnv(FluidEnv):
         self.pourer_offset = -0.07
         self.create_glass(self.glass_dis_x, self.glass_dis_z, self.height, self.border, "pourer")
         self.create_glass(self.poured_glass_dis_x, self.poured_glass_dis_z, self.poured_height, self.poured_border, "poured")
-        self.plant = True
+        self.plant = True  
         num_plant_boxes = 2
         if self.plant:
-            plant_box_centers = self.create_plant()
-            num_plant_boxes = 1 + len(plant_box_centers)
+            plant_box_centers, is_collision_box = self.create_plant(create_collision_boxes = not self.plant_set)
+            num_plant_boxes =len(plant_box_centers)
 
         # move pouring glass to be at ground
         self.starting_pourer_height = 0.6
@@ -279,6 +290,7 @@ class PourWaterPlantPosControlEnv(FluidEnv):
                                                          self.poured_glass_dis_x, self.poured_glass_dis_z, self.poured_height, self.poured_border)
         if self.plant and not self.plant_set:
             self.plant_states = np.zeros((num_plant_boxes, self.dim_shape_state))
+            self.is_collision_box = is_collision_box
             x_plant = 0.64
             quat = quatFromAxisAngle([0, 0, -1.], 0.0)
             scaling = 1.0
@@ -296,7 +308,7 @@ class PourWaterPlantPosControlEnv(FluidEnv):
                         self.plant_states[i, :3] = scaling*np.array([x_plant + center[0], center[1], center[2]])
                         self.plant_states[i,3:6] = self.plant_states[i,:3]
                         self.plant_states[:, 6:10] = quat
-            self.set_collision_shape_states(self.plant_states, "plant")
+            self.set_collision_shape_states(self.plant_states, "plant", is_collision_box=is_collision_box)
             self.plant_set = True
 
         
@@ -454,7 +466,7 @@ class PourWaterPlantPosControlEnv(FluidEnv):
         # check if the movement of the pouring glass collide with the poured glass.
         # the action only take effects if there is no collision
         new_states = self.rotate_glass(self.glass_states, x, y, theta)
-        if True and not self.judge_glass_collide(new_states, theta) and self.above_floor(new_states, theta):
+        if not self.judge_glass_collide(new_states, theta) and self.above_floor(new_states, theta) and not self.collide_with_plant(new_states, theta):
             self.glass_states = new_states
             self.glass_x, self.glass_y, self.glass_rotation = x, y, theta
         else:  # invalid move, old state becomes the same as the current state
@@ -571,12 +583,13 @@ class PourWaterPlantPosControlEnv(FluidEnv):
         return False
 
 
-    def create_plant(self):
+    def create_plant(self, create_collision_boxes=True):
         quat = quatFromAxisAngle([0, 0, -1.], 0)
         self.stem_height = 1.00
         #halfEdge = np.array([stem_height/2, stem_height/2, stem_height/2])
         halfEdgeStem = np.array([0.01, self.stem_height/2, 0.01])
         center = np.array([0.0,0.0,0.0])
+        is_collision_plant_box = []
         #pyflex.add_box(halfEdgeStem, center, quat)
         #self.add_collision_box(halfEdgeStem, center, quat, "plant")
         path = os.environ["PYFLEXROOT"]
@@ -585,8 +598,10 @@ class PourWaterPlantPosControlEnv(FluidEnv):
         centers = []
         scaling = 5.0
         p_skip = 0.5
-        p_skip_collision = 0.8
+        collision_scaling = 1.1
+        p_skip_collision = 0.9
         max_x = -0.01
+        np.random.seed(0)
         for box in saved_boxes:
             if np.random.random() < p_skip:
                 continue
@@ -595,13 +610,18 @@ class PourWaterPlantPosControlEnv(FluidEnv):
                 continue #make physics more manageable
             center = scaling*box[:3]
             facelength = box[-1] /1.1
-            leafHalfEdge = scaling*np.array([facelength, facelength, facelength])
+            leafHalfEdge = scaling*np.array([facelength+0.001, facelength, facelength+0.001])
             centers.append(center)
             pyflex.add_box(leafHalfEdge, np.array([0.0, 0.0, 0.0]), quat)
-            if np.random.random() < p_skip_collision:
+            if not create_collision_boxes:
                 continue
-            self.add_collision_box(leafHalfEdge, center, quat, "plant")
-        return centers
+            if np.random.random() > p_skip_collision:
+                is_collision_plant_box.append(True)
+            else:
+                is_collision_plant_box.append(False)
+                continue
+            self.add_collision_box(collision_scaling * leafHalfEdge, center, quat, "plant")
+        return centers, np.array(is_collision_plant_box)
 
     def create_umbrellaplant(self):
         quat = quatFromAxisAngle([0, 0, -1.], 0)
@@ -741,11 +761,16 @@ class PourWaterPlantPosControlEnv(FluidEnv):
         all_states = np.concatenate((glass_states, poured_glass_states, plant_state), axis=0)
         pyflex.set_shape_states(all_states)
 
-    def set_collision_shape_states(self, states, obj_idx):
+    def set_collision_shape_states(self, states, obj_idx, is_collision_box=None):
         fcl_objects = self.fcl_objects_by_id[obj_idx]
         #remember: pyflex uses xyzw and fcl uses wxyz
+        if is_collision_box is not None:
+            assert len(fcl_objects) == is_collision_box.sum()
+            relevant_states = states[is_collision_box]
+        else:
+            relevant_states = states
         poses = []
-        for state_row, fcl_obj in zip(states, fcl_objects):
+        for state_row, fcl_obj in zip(relevant_states, fcl_objects):
             pos = state_row[:3]
             quat_xyzw = state_row[6:10]
             quat_wxyz = wxyz_fcl_from_xyzw_pyflex(quat_xyzw)
@@ -785,6 +810,12 @@ class PourWaterPlantPosControlEnv(FluidEnv):
 
         res = (x >= x_lower) * (x <= x_upper) * (y >= y_lower) * (y <= y_upper) * (z >= z_lower) * (z <= z_upper)
         return res
+
+    def collide_with_plant(self, new_states, rotation):
+        self.set_collision_shape_states(new_states, "pourer")
+        result = self.in_collision("pourer", "plant")
+        self.set_collision_shape_states(self.glass_states, "pourer")
+        return result
 
     def judge_glass_collide(self, new_states, rotation):
         '''
