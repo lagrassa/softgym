@@ -450,6 +450,14 @@ class PourWaterPlantPosControlEnv(FluidEnv):
             'performance': performance
         }
 
+    def predict_collide_with_plant(self, target_pos):
+        x, y, theta = target_pos
+        new_states = self.rotate_glass(self.glass_states, x, y, theta)
+        if self.judge_glass_collide(new_states, theta) or self.collide_with_plant(new_states, theta):
+            return True
+        return False
+
+
     def _step(self, action):
         '''
         action: np.ndarray of dim 1x3, (x, y, theta). (x, y) specifies the floor center coordinate, and theta 
