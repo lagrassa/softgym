@@ -231,7 +231,7 @@ class PourWaterPlantPosControlEnv(FluidEnv):
         self.height = params['height']
 
         fluid_radis = self.fluid_params['radius'] * self.fluid_params['rest_dis_coef']
-        self.glass_dis_x = self.fluid_params['dim_x'] * fluid_radis + 0.04   # glass floor length
+        self.glass_dis_x = self.fluid_params['dim_x'] * fluid_radis + 0.01 # 0.04   # glass floor length
         self.glass_dis_z = self.fluid_params['dim_z'] * fluid_radis + 0.04  # glass width
 
         params['glass_dis_x'] = self.glass_dis_x
@@ -281,7 +281,7 @@ class PourWaterPlantPosControlEnv(FluidEnv):
             num_plant_boxes =len(plant_box_centers)
 
         # move pouring glass to be at ground
-        self.starting_pourer_height = 0.6
+        self.starting_pourer_height = 0.3
         self.glass_states = self.init_glass_state(self.x_center + self.pourer_offset, self.starting_pourer_height, self.glass_dis_x, self.glass_dis_z, self.height, self.border)
 
 
@@ -607,7 +607,7 @@ class PourWaterPlantPosControlEnv(FluidEnv):
         scaling = 5.0
         p_skip = 0.5
         collision_scaling = 1.1
-        p_skip_collision = 0.9
+        p_skip_collision = 0.94
         max_x = -0.01
         np.random.seed(0)
         for box in saved_boxes:
