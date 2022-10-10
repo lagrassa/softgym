@@ -73,6 +73,19 @@ def save_numpy_as_gif(array, filename, fps=20, scale=1.0):
     clip.write_gif(filename, fps=fps)
     return clip
 
+def save_numpy_as_mp4(array, filename, fps=20, scale=1.0):
+    # ensure that the file has the .gif extension
+    fname, _ = os.path.splitext(filename)
+    filename = fname + '.mp4'
+
+    # copy into the color dimension if the images are black and white
+    if array.ndim == 3:
+        array = array[..., np.newaxis] * np.ones(3)
+
+    # make the moviepy clip
+    clip = ImageSequenceClip(list(array), fps=fps).resize(scale)
+    clip.write_videofile(filename, fps=fps, audio=False)
+    return clip
 
 def save_numpy_to_gif_matplotlib(array, filename, interval=50):
     from matplotlib import animation

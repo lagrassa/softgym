@@ -72,7 +72,7 @@ class PourWaterPosControlEnv(FluidEnv):
                 'radius': 0.033,
                 'rest_dis_coef': 0.55,
                 'cohesion': 0.1,  # not actually used, instead, is computed as viscosity * 0.01
-                'viscosity': 3.1,
+                'viscosity': 0.1,
                 'surfaceTension': 0,
                 'adhesion': 0.0,  # not actually used, instead, is computed as viscosity * 0.001
                 'vorticityConfinement': 40,
@@ -145,6 +145,7 @@ class PourWaterPosControlEnv(FluidEnv):
         self.config = self.config_variations[config_idx]
         return self.config
 
+
     def _reset(self):
         '''
         reset to environment to the initial state.
@@ -186,8 +187,8 @@ class PourWaterPosControlEnv(FluidEnv):
 
     def initialize_camera(self):
         self.camera_params = {
-            'default_camera': {'pos': np.array([-0.1, 0.9, 3.15]),
-                               'angle': np.array([0.00 * np.pi, -20 / 180. * np.pi, 0]),
+            'default_camera': {'pos': np.array([0.1, 1.0, 1.8]), #-.1, .9, 3.15
+                               'angle': np.array([0.00 * np.pi, -20 / 180. * np.pi, 0]), #-20/180
                                #'angle': np.array([0.45 * np.pi, -60 / 180. * np.pi, 0]),
                                'width': self.camera_width,
                                'height': self.camera_height},
@@ -240,6 +241,7 @@ class PourWaterPosControlEnv(FluidEnv):
         super().set_scene(config)  # do not sample fluid parameters, as it's very likely to generate very strange fluid
 
         self.fcl_objects_by_id = {}
+        pyflex.set_shape_color([99/255.,74/255.,42/255.])
         # compute glass params
         if states is None:
             self.set_pouring_glass_params(config["glass"])
@@ -258,14 +260,15 @@ class PourWaterPosControlEnv(FluidEnv):
             self.glass_params = glass_params
 
         # create pouring glass & poured glass
+        self.pourer_offset = -0.07
         self.create_glass(self.glass_dis_x, self.glass_dis_z, self.height, self.border, "pourer")
         self.create_glass(self.poured_glass_dis_x, self.poured_glass_dis_z, self.poured_height, self.poured_border, "poured")
-        self.plant = True
+        self.plant = False
         if self.plant:
             self.create_plant()
 
         # move pouring glass to be at ground
-        self.glass_states = self.init_glass_state(self.x_center, 0, self.glass_dis_x, self.glass_dis_z, self.height, self.border)
+        self.glass_states = self.init_glass_state(self.x_center + self.pourer_offset, 0, self.glass_dis_x, self.glass_dis_z, self.height, self.border)
 
 
         # move poured glass to be at ground
@@ -278,16 +281,17 @@ class PourWaterPosControlEnv(FluidEnv):
             self.plant_states[0, 3:6] = self.plant_states[0, :3] #np.array([0.28, 0*self.stem_height/2, 0.])
             self.plant_states[1, :3] = np.array([x_plant, self.stem_height/2, 0.])
             self.plant_states[1,3:6] = self.plant_states[1,:3]
-            quat = quatFromAxisAngle([0, 0, -1.], 0.05)
+            quat = quatFromAxisAngle([0, 0, -1.], 0.0)
             self.plant_states[:, 6:10] = quat
 
         self.set_shape_states(self.glass_states, self.poured_glass_states, self.plant_states)
         self.set_collision_shape_states(self.glass_states, "pourer")
         self.set_collision_shape_states(self.poured_glass_states, "poured")
-        self.set_collision_shape_states(self.plant_states, "plant")
+        if self.plant:
+            self.set_collision_shape_states(self.plant_states, "plant")
 
         # record glass floor center x, y, and rotation
-        self.glass_x = self.x_center
+        self.glass_x = self.x_center  + self.pourer_offset
         if self.action_mode == 'rotation_bottom':
             self.glass_y = 0
         elif self.action_mode == 'rotation_top':
@@ -307,6 +311,7 @@ class PourWaterPosControlEnv(FluidEnv):
             fluid_radius = self.fluid_params['radius'] * self.fluid_params['rest_dis_coef']
             fluid_dis = np.array([1.0 * fluid_radius, fluid_radius * 0.5, 1.0 * fluid_radius])
             lower_x = self.glass_params['glass_x_center'] - self.glass_params['glass_dis_x'] / 2. + self.glass_params['border']
+            lower_x += self.pourer_offset
             lower_z = -self.glass_params['glass_dis_z'] / 2 + self.glass_params['border']
             lower_y = self.glass_params['border']
             if self.action_mode in ['sawyer', 'franka']:
@@ -445,7 +450,8 @@ class PourWaterPosControlEnv(FluidEnv):
         self.set_shape_states(self.glass_states, self.poured_glass_states, self.plant_states)
         self.set_collision_shape_states(self.glass_states, "pourer")
         self.set_collision_shape_states(self.poured_glass_states, "poured")
-        self.set_collision_shape_states(self.plant_states, "plant")
+        if self.plant:
+            self.set_collision_shape_states(self.plant_states, "plant")
         pyflex.step(render=True)
 
         self.inner_step += 1
@@ -497,7 +503,8 @@ class PourWaterPosControlEnv(FluidEnv):
         #Adds a collision box to the cache
         if obj_id not in self.fcl_objects_by_id:
             self.fcl_objects_by_id[obj_id] = []
-        fcl_object = make_fcl_box(halfEdge, center, quat)
+        fullEdge = 2*halfEdge
+        fcl_object = make_fcl_box(fullEdge, center, quat)
         self.fcl_objects_by_id[obj_id].append(fcl_object)
         
     def in_collision(self, idx1, idx2):
@@ -511,6 +518,32 @@ class PourWaterPosControlEnv(FluidEnv):
             if ret:
                 return True
         return False
+
+    def in_collision_sphere(self, center, radius, obj_idxs = []):
+        sphere_shape = fcl.Sphere(radius)
+        tf = fcl.Transform(center)
+        sphere = fcl.CollisionObject(sphere_shape, tf)
+        for obj_idx in obj_idxs:
+            for prim in self.fcl_objects_by_id[obj_idx]:
+                request = fcl.CollisionRequest()
+                result = fcl.CollisionResult()
+                ret = fcl.collide(sphere, prim, request, result)
+                if ret:
+                    return True
+        return False
+
+    def in_collision_sphere_premade(self, center, sphere, obj_idxs = []):
+        for obj_idx in obj_idxs:
+            if obj_idx not in self.fcl_objects_by_id:
+                continue
+            for prim in self.fcl_objects_by_id[obj_idx]:
+                request = fcl.CollisionRequest()
+                result = fcl.CollisionResult()
+                ret = fcl.collide(sphere, prim, request, result)
+                if ret:
+                    return True
+        return False
+
 
 
     def create_plant(self):

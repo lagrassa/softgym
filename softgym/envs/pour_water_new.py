@@ -194,8 +194,11 @@ class PourWaterPlantPosControlEnv(FluidEnv):
 
     def initialize_camera(self):
         self.camera_params = {
-            'default_camera': {'pos': np.array([-0.1, 0.9, 3.15]),
-                               'angle': np.array([0.00 * np.pi, -20 / 180. * np.pi, 0]),
+           'default_camera': {'pos': np.array([0.1, 1.0, 1.8]), #-.1, .9, 3.15
+                              'angle': np.array([0.00 * np.pi, -20 / 180. * np.pi, 0]), #-20/180
+
+            #'default_camera': {'pos': np.array([0.1, 0.2, 2.15]), #-.1, .9, 3.15
+            #                   'angle': np.array([0.00 * np.pi, 0 / 180. * np.pi, 0]), #-20/180
                                #'angle': np.array([0.45 * np.pi, -60 / 180. * np.pi, 0]),
                                'width': self.camera_width,
                                'height': self.camera_height},
@@ -246,6 +249,7 @@ class PourWaterPlantPosControlEnv(FluidEnv):
         '''
         # create fluid
         super().set_scene(config)  # do not sample fluid parameters, as it's very likely to generate very strange fluid
+        pyflex.set_shape_color([99/255.,74/255.,42/255.])
 
         if "plant" in self.fcl_objects_by_id:
             self.fcl_objects_by_id_old = self.fcl_objects_by_id
@@ -274,14 +278,16 @@ class PourWaterPlantPosControlEnv(FluidEnv):
         self.pourer_offset = -0.07
         self.create_glass(self.glass_dis_x, self.glass_dis_z, self.height, self.border, "pourer")
         self.create_glass(self.poured_glass_dis_x, self.poured_glass_dis_z, self.poured_height, self.poured_border, "poured")
+        color = np.array([62/255, 230/255, 67/255])
+        pyflex.set_sphere_shape_color(color)
         self.plant = True  
         num_plant_boxes = 2
         if self.plant:
             plant_box_centers, is_collision_box = self.create_plant(create_collision_boxes = not self.plant_set)
             num_plant_boxes =len(plant_box_centers)
 
-        # move pouring glass to be at ground
-        self.starting_pourer_height = 0.3
+ 
+        self.starting_pourer_height = 0.6 #0.5
         self.glass_states = self.init_glass_state(self.x_center + self.pourer_offset, self.starting_pourer_height, self.glass_dis_x, self.glass_dis_z, self.height, self.border)
 
 
@@ -605,9 +611,9 @@ class PourWaterPlantPosControlEnv(FluidEnv):
         saved_boxes = np.load(saved_boxes_fn)
         centers = []
         scaling = 5.0
-        p_skip = 0.5
+        p_skip = 0.4 #0.3 #0.3 #0.5
         collision_scaling = 1.1
-        p_skip_collision = 0.94
+        p_skip_collision = 0.99
         max_x = -0.01
         np.random.seed(0)
         for box in saved_boxes:
@@ -621,6 +627,7 @@ class PourWaterPlantPosControlEnv(FluidEnv):
             leafHalfEdge = scaling*np.array([facelength+0.001, facelength, facelength+0.001])
             centers.append(center)
             pyflex.add_box(leafHalfEdge, np.array([0.0, 0.0, 0.0]), quat)
+            #pyflex.add_sphere(leafHalfEdge[0].item()/1.4, np.array([0,0,0]), quat)
             if not create_collision_boxes:
                 continue
             if np.random.random() > p_skip_collision:
