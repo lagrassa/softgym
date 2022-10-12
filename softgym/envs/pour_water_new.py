@@ -80,7 +80,7 @@ class PourWaterPlantPosControlEnv(FluidEnv):
                 'radius': 0.033, #originally 0.033
                 'rest_dis_coef': 0.55,
                 'cohesion': 0.1,  # not actually used, instead, is computed as viscosity * 0.01
-                'viscosity': 9.1, #3.1 originally
+                'viscosity': 300.1, #3.1 originally
                 'surfaceTension': 0,
                 'adhesion': 0.0,  # not actually used, instead, is computed as viscosity * 0.001
                 'vorticityConfinement': 40,
@@ -194,11 +194,11 @@ class PourWaterPlantPosControlEnv(FluidEnv):
 
     def initialize_camera(self):
         self.camera_params = {
-           'default_camera': {'pos': np.array([0.1, 1.0, 1.8]), #-.1, .9, 3.15
-                              'angle': np.array([0.00 * np.pi, -20 / 180. * np.pi, 0]), #-20/180
+           #'default_camera': {'pos': np.array([0.1, 1.9, 0.5]), #.1, 1.0, 1.8
+           #                   'angle': np.array([0.00 * np.pi, -60 / 180. * np.pi, 0]), #-20/180
 
-            #'default_camera': {'pos': np.array([0.1, 0.2, 2.15]), #-.1, .9, 3.15
-            #                   'angle': np.array([0.00 * np.pi, 0 / 180. * np.pi, 0]), #-20/180
+            'default_camera': {'pos': np.array([0.1, 0.2, 2.15]), #-.1, .9, 3.15
+                               'angle': np.array([0.00 * np.pi, 0 / 180. * np.pi, 0]), #-20/180
                                #'angle': np.array([0.45 * np.pi, -60 / 180. * np.pi, 0]),
                                'width': self.camera_width,
                                'height': self.camera_height},
@@ -311,7 +311,7 @@ class PourWaterPlantPosControlEnv(FluidEnv):
                 else:
                     for i, center in enumerate(plant_box_centers):
                         #self.plant_states[i, :3] = np.array([center[0], center[1] + self.stem_height/2, center[2]])
-                        self.plant_states[i, :3] = scaling*np.array([x_plant + center[0], center[1], center[2]])
+                        self.plant_states[i, :3] = scaling*np.array([x_plant + center[0], center[1], center[2]-0.01])
                         self.plant_states[i,3:6] = self.plant_states[i,:3]
                         self.plant_states[:, 6:10] = quat
             self.set_collision_shape_states(self.plant_states, "plant", is_collision_box=is_collision_box)
