@@ -41,6 +41,7 @@ class PourWaterPlantPosControlEnv(FluidEnv):
         self.plant_set = False #to avoid setting plant states multiple times
         self.wall_num = 5  # number of glass walls. floor/left/right/front/back
         super().__init__(**kwargs)
+        self.render = kwargs["render"]
         self.get_cached_configs_and_states(cached_states_path, self.num_variations)
         #self.cached_configs = [self.get_default_config()]
         if observation_mode in ['point_cloud', 'key_point']:
@@ -162,7 +163,7 @@ class PourWaterPlantPosControlEnv(FluidEnv):
         self.performance_init = None
         info = self._get_info()
         self.performance_init = info['performance']
-        pyflex.step(render=True)
+        pyflex.step(render=self.render)
         return self._get_obs()
 
     def get_state(self):
@@ -279,7 +280,7 @@ class PourWaterPlantPosControlEnv(FluidEnv):
         self.create_glass(self.glass_dis_x, self.glass_dis_z, self.height, self.border, "pourer")
         self.create_glass(self.poured_glass_dis_x, self.poured_glass_dis_z, self.poured_height, self.poured_border, "poured")
         color = np.array([62/255, 230/255, 67/255])
-        pyflex.set_sphere_shape_color(color)
+        #pyflex.set_sphere_shape_color(color)
         self.plant = True  
         num_plant_boxes = 2
         if self.plant:
@@ -493,7 +494,7 @@ class PourWaterPlantPosControlEnv(FluidEnv):
         self.set_collision_shape_states(self.poured_glass_states, "poured")
         if False and self.plant:
             self.set_collision_shape_states(self.plant_states, "plant")
-        pyflex.step(render=True)
+        pyflex.step(render=self.render)
 
         self.inner_step += 1
 
@@ -613,7 +614,7 @@ class PourWaterPlantPosControlEnv(FluidEnv):
         scaling = 5.0
         p_skip = 0.4 #0.3 #0.3 #0.5
         collision_scaling = 1.1
-        p_skip_collision = 0.99
+        p_skip_collision = 0.85
         max_x = -0.01
         np.random.seed(0)
         for box in saved_boxes:
