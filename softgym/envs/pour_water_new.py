@@ -41,7 +41,7 @@ class PourWaterPlantPosControlEnv(FluidEnv):
         self.plant_set = False #to avoid setting plant states multiple times
         self.wall_num = 5  # number of glass walls. floor/left/right/front/back
         super().__init__(**kwargs)
-        self.render = kwargs["render"]
+        self._render = kwargs["render"]
         self.get_cached_configs_and_states(cached_states_path, self.num_variations)
         #self.cached_configs = [self.get_default_config()]
         if observation_mode in ['point_cloud', 'key_point']:
@@ -91,7 +91,7 @@ class PourWaterPlantPosControlEnv(FluidEnv):
                 'dim_z': 8,
             },
             'glass': {
-                'border': 0.02,
+                'border': 0.01,
                 'height': 0.6,
                 'glass_distance': 1.0,
                 'poured_border': 0.04,
@@ -113,16 +113,16 @@ class PourWaterPlantPosControlEnv(FluidEnv):
         config_variations = [copy.deepcopy(config) for _ in range(num_variations)]
         for idx in range(num_variations):
             print("pour water generate env variations {}".format(idx))
-            dim_x = 5 #random.choice(dim_xs)
-            dim_z = 6 #random.choice(dim_zs)
+            dim_x = 2 #random.choice(dim_xs)
+            dim_z = 2 #random.choice(dim_zs)
             m = min(dim_x, dim_z)
             print("generate env variation: medium volume water")
-            dim_y = int(3.5 * m)
+            dim_y = int(10.5 * m)
             v = dim_x * dim_y * dim_z
             water_radius = config['fluid']['radius'] * config['fluid']['rest_dis_coef']
-            h = v / ((dim_x + 1) * (dim_z + 1)) * water_radius / 2
+            #h = v / ((dim_x + 1) * (dim_z + 1)) * water_radius / 2
             #glass_height = h + (np.random.rand() - 0.5) * 0.001 + config['glass']['border']
-            glass_height = h + (0.3 - 0.5) * 0.001 + config['glass']['border']
+            glass_height = 0.08 #0.13 is old
 
             config_variations[idx]['fluid']['dim_x'] = dim_x
             config_variations[idx]['fluid']['dim_y'] = dim_y
@@ -163,7 +163,7 @@ class PourWaterPlantPosControlEnv(FluidEnv):
         self.performance_init = None
         info = self._get_info()
         self.performance_init = info['performance']
-        pyflex.step(render=self.render)
+        pyflex.step(render=self._render)
         return self._get_obs()
 
     def get_state(self):
@@ -235,8 +235,8 @@ class PourWaterPlantPosControlEnv(FluidEnv):
         self.height = params['height']
 
         fluid_radis = self.fluid_params['radius'] * self.fluid_params['rest_dis_coef']
-        self.glass_dis_x = self.fluid_params['dim_x'] * fluid_radis + 0.01 # 0.04   # glass floor length
-        self.glass_dis_z = self.fluid_params['dim_z'] * fluid_radis + 0.04  # glass width
+        self.glass_dis_x = (self.fluid_params['dim_x']+4) * fluid_radis - 0.07 # old version had _ 0.01 + 0.01 # 0.04   # glass floor length
+        self.glass_dis_z = (self.fluid_params['dim_z']+4 )* fluid_radis + 0.04  # glass width
 
         params['glass_dis_x'] = self.glass_dis_x
         params['glass_dis_z'] = self.glass_dis_z
@@ -364,7 +364,7 @@ class PourWaterPlantPosControlEnv(FluidEnv):
             pyflex.set_positions(fluid_pos)
             print("stablize water!")
             for _ in range(100):
-                pyflex.step()
+                pyflex.step(render=True)
 
             state_dic = self.get_state()
             water_state = state_dic['particle_pos'].reshape((-1, self.dim_position))
@@ -494,7 +494,7 @@ class PourWaterPlantPosControlEnv(FluidEnv):
         self.set_collision_shape_states(self.poured_glass_states, "poured")
         if False and self.plant:
             self.set_collision_shape_states(self.plant_states, "plant")
-        pyflex.step(render=self.render)
+        pyflex.step(render=self._render)
 
         self.inner_step += 1
 
@@ -614,7 +614,7 @@ class PourWaterPlantPosControlEnv(FluidEnv):
         scaling = 5.0
         p_skip = 0.4 #0.3 #0.3 #0.5
         collision_scaling = 1.1
-        p_skip_collision = 0.85
+        p_skip_collision = 0.95
         max_x = -0.01
         np.random.seed(0)
         for box in saved_boxes:
