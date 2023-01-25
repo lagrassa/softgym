@@ -277,8 +277,10 @@ class PourWaterPlantPosControlEnv(FluidEnv):
 
         # create pouring glass & poured glass
         self.pourer_offset = -0.07
+        buffer_pourer_eps = 0.01
         self.create_glass(self.glass_dis_x, self.glass_dis_z, self.height, self.border, "pourer")
         self.create_glass(self.poured_glass_dis_x, self.poured_glass_dis_z, self.poured_height, self.poured_border, "poured")
+        self.create_glass(self.glass_dis_x + buffer_pourer_eps, self.glass_dis_z + buffer_pourer_eps, self.height + buffer_pourer_eps, self.border, "buffer_pourer", fcl_only=True)
         color = np.array([62/255, 230/255, 67/255])
         #pyflex.set_sphere_shape_color(color)
         self.plant = True  
@@ -460,7 +462,7 @@ class PourWaterPlantPosControlEnv(FluidEnv):
     def predict_collide_with_plant(self, target_pos):
         x, y, theta = target_pos
         new_states = self.rotate_glass(self.glass_states, x, y, theta)
-        if self.judge_glass_collide(new_states, theta) or self.collide_with_plant(new_states, theta):
+        if self.judge_glass_collide(new_states, theta) or self.collide_with_plant(new_states, theta, buffer_object=True):
             return True
         return False
 
@@ -498,7 +500,7 @@ class PourWaterPlantPosControlEnv(FluidEnv):
 
         self.inner_step += 1
 
-    def create_glass(self, glass_dis_x, glass_dis_z, height, border, obj_id="generic_glass"):
+    def create_glass(self, glass_dis_x, glass_dis_z, height, border, obj_id="generic_glass", fcl_only = False):
         """
         the glass is a box, with each wall of it being a very thin box in Flex.
         each wall of the real box is represented by a box object in Flex with really small thickness (determined by the param border)
@@ -537,7 +539,8 @@ class PourWaterPlantPosControlEnv(FluidEnv):
             halfEdge = boxes[i][0]
             center = boxes[i][1]
             quat = boxes[i][2]
-            pyflex.add_box(halfEdge, center, quat)
+            if not fcl_only:
+                pyflex.add_box(halfEdge, center, quat)
             self.add_collision_box(halfEdge, center, quat, obj_id)
         return boxes
 
@@ -827,9 +830,14 @@ class PourWaterPlantPosControlEnv(FluidEnv):
         res = (x >= x_lower) * (x <= x_upper) * (y >= y_lower) * (y <= y_upper) * (z >= z_lower) * (z <= z_upper)
         return res
 
-    def collide_with_plant(self, new_states, rotation):
-        self.set_collision_shape_states(new_states, "pourer")
-        result = self.in_collision("pourer", "plant")
+    def collide_with_plant(self, new_states, rotation, buffer_object=False):
+        if buffer_object:
+            pourer_fcl = "buffer_pourer"
+        else:
+            pourer_fcl = "pourer"
+        #pourer_fcl = "pourer"
+        self.set_collision_shape_states(new_states, pourer_fcl)
+        result = self.in_collision(pourer_fcl, "plant")
         self.set_collision_shape_states(self.glass_states, "pourer")
         return result
 
