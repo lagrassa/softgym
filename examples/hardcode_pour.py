@@ -61,9 +61,7 @@ def main():
     point_dataset = None
     vector_dataset = None
     actions = []
-    low_pour = True
-    #for i in range(100000):
-    #    pyflex.render()
+    low_pour = False
     if low_pour:
         for i in range(4):
             actions.append(np.array([0.0,-0.07, 0]))
@@ -76,10 +74,10 @@ def main():
         for i in range(14):
             actions.append(np.array([0, 0.0, 0.02]))
     if not low_pour:
-        for i in range(3):
-            actions.append(np.array([0.00, 0.10, 0]))
-        for i in range(4):
-            actions.append(np.array([0.06, 0.0, 0]))
+        for i in range(17):
+            actions.append(np.array([0.00, 0.03, 0]))
+        for i in range(12):
+            actions.append(np.array([0.03, 0.0, 0]))
         for i in range(8):
             actions.append(np.array([0, 0.0, 0.4]))
         for i in range(14):
@@ -90,6 +88,7 @@ def main():
         # By default, the environments will apply action repitition. The option of record_continuous_video provides rendering of all
         # intermediate frames. Only use this option for visualization as it increases computation.
         data = env.step(action, record_continuous_video=True, img_size=args.img_size)
+        #plant_collide = env._wrapped_env.predict_collide_with_plant(data[0][0][0:3])
         if point_dataset is None:
             vector_dataset = np.zeros((env.horizon, 13))
             point_dataset = np.zeros((env.horizon,data[0][1].shape[0], 4))
@@ -97,11 +96,12 @@ def main():
         #dataset.append(data[0])
         #point_dataset[i, :]  = data[0][1]
         vector_dataset[i]  = data[0][0]
-        #frames.extend(info['flex_env_recorded_frames'])
+        frames.extend(info['flex_env_recorded_frames'])
         if args.test_depth:
             show_depth()
     np.save("data/pass_water_vector_dataset.npy", vector_dataset)
     np.save("data/pass_water_point_dataset.npy", point_dataset)
+    import ipdb; ipdb.set_trace()
     if args.save_video_dir is not None:
         save_name = osp.join(args.save_video_dir, args.env_name + '.gif')
         save_numpy_as_gif(np.array(frames), save_name)
