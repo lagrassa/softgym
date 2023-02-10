@@ -642,6 +642,14 @@ class PourWaterPlantPosControlEnv(FluidEnv):
             self.add_collision_box(collision_scaling * leafHalfEdge, center, quat, "plant")
         return centers, np.array(is_collision_plant_box)
 
+    def move_plant(self, x, y):
+        #moves plant x units in x and y units in y
+        for i in range(self.plant_states.shape[0]):
+            self.plant_states[i, :2] +=  np.array([x,y])
+            self.plant_states[i,3:6] = self.plant_states[i,:3]
+        self.set_collision_shape_states(self.plant_states, "plant", is_collision_box=self.is_collision_box)
+
+
     def create_umbrellaplant(self):
         quat = quatFromAxisAngle([0, 0, -1.], 0)
         self.stem_height = 1.00
