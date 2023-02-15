@@ -78,12 +78,12 @@ class PourWaterPlantPosControlEnv(FluidEnv):
     def get_default_config(self):
         config = {
             'fluid': {
-                'radius': 0.033, #originally 0.033
+                'radius': 0.035, #originally 0.033
                 'rest_dis_coef': 0.55,
-                'cohesion': 0.1,  # not actually used, instead, is computed as viscosity * 0.01
-                'viscosity': 300.1, #3.1 originally
+                'cohesion': 0.001,  # not actually used, instead, is computed as viscosity * 0.01
+                'viscosity': 300, #3.1 originally
                 'surfaceTension': 0,
-                'adhesion': 0.0,  # not actually used, instead, is computed as viscosity * 0.001
+                'adhesion': 50,  # not actually used, instead, is computed as viscosity * 0.001
                 'vorticityConfinement': 40,
                 'solidpressure': 0.,
                 'dim_x': 8,
@@ -198,8 +198,8 @@ class PourWaterPlantPosControlEnv(FluidEnv):
            #'default_camera': {'pos': np.array([0.1, 1.9, 0.5]), #.1, 1.0, 1.8
            #                   'angle': np.array([0.00 * np.pi, -60 / 180. * np.pi, 0]), #-20/180
 
-            'default_camera': {'pos': np.array([0.1, 0.2, 2.15]), #-.1, .9, 3.15
-                               'angle': np.array([0.00 * np.pi, 0 / 180. * np.pi, 0]), #-20/180
+            'default_camera': {'pos': np.array([0.1, 0.2, 2.15]), #0.1, 0.2, 2.15
+                               'angle': np.array([0 * np.pi, 0 / 180. * np.pi, 0]), #-20/180
                                #'angle': np.array([0.45 * np.pi, -60 / 180. * np.pi, 0]),
                                'width': self.camera_width,
                                'height': self.camera_height},
@@ -615,7 +615,7 @@ class PourWaterPlantPosControlEnv(FluidEnv):
         saved_boxes = np.load(saved_boxes_fn)
         centers = []
         scaling = 5.0
-        p_skip = 0.4 #0.3 #0.3 #0.5
+        p_skip = 0.3 #0.3 #0.3 #0.5
         collision_scaling = 1.1
         p_skip_collision = 0.95
         max_x = -0.01
@@ -627,7 +627,7 @@ class PourWaterPlantPosControlEnv(FluidEnv):
             if box[0] > max_x:
                 continue #make physics more manageable
             center = scaling*box[:3]
-            facelength = box[-1] /1.1
+            facelength = box[-1] /0.95
             leafHalfEdge = scaling*np.array([facelength+0.001, facelength, facelength+0.001])
             centers.append(center)
             pyflex.add_box(leafHalfEdge, np.array([0.0, 0.0, 0.0]), quat)
@@ -642,10 +642,10 @@ class PourWaterPlantPosControlEnv(FluidEnv):
             self.add_collision_box(collision_scaling * leafHalfEdge, center, quat, "plant")
         return centers, np.array(is_collision_plant_box)
 
-    def move_plant(self, x, y):
-        #moves plant x units in x and y units in y
+    def move_plant(self, z, y):
+        #moves plant z units in z and y units in y
         for i in range(self.plant_states.shape[0]):
-            self.plant_states[i, :2] +=  np.array([x,y])
+            self.plant_states[i, 1:3] +=  np.array([y,z])
             self.plant_states[i,3:6] = self.plant_states[i,:3]
         self.set_collision_shape_states(self.plant_states, "plant", is_collision_box=self.is_collision_box)
 

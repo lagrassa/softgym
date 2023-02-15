@@ -60,6 +60,7 @@ public:
 		cam_width = int(ptr[20]);
 		cam_height = int(ptr[21]);
 		int render = int(ptr[22]);
+		int numSubsteps = int(ptr[23]);
 
 
 		/*
@@ -89,7 +90,7 @@ public:
 		g_sceneLower = Vec3(-2.0f, 0.0f, -1.0f);
 		g_sceneUpper = Vec3(2.0f, 1.0f, 1.0f);
 
-		g_numSubsteps = 2;
+		g_numSubsteps = numSubsteps;
 
 		g_params.radius = radius;
 		g_params.dynamicFriction = 0.01f;

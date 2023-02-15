@@ -45,9 +45,11 @@ class FluidEnv(FlexEnv):
         camera_name = config.get('camera_name', self.camera_name)
         camera_params = np.array([*self.camera_params[camera_name]['pos'],
                                   *self.camera_params[camera_name]['angle'], self.camera_width, self.camera_height, self.render_mode])
+        num_substeps=8
+        scene_params = np.array([num_substeps])
 
         # create fluid
-        scene_params = np.concatenate((fluid_params, camera_params))
+        scene_params = np.concatenate((fluid_params, camera_params, scene_params))
 
         env_idx = 1
         if self.version == 2:
