@@ -35,6 +35,7 @@ class PourWaterPlantPosControlEnv(FluidEnv):
 
         self.observation_mode = observation_mode
         self.fcl_objects_by_id = {}
+        self.fcl_managers_by_id = {}
         self.inner_step = 0
         self.performance_init = False
         self.action_mode = action_mode
@@ -254,8 +255,11 @@ class PourWaterPlantPosControlEnv(FluidEnv):
 
         if "plant" in self.fcl_objects_by_id:
             self.fcl_objects_by_id_old = self.fcl_objects_by_id
+            self.fcl_managers_by_id_old = self.fcl_managers_by_id
             self.fcl_objects_by_id = {}
+            self.fcl_managers_by_id = {}
             self.fcl_objects_by_id["plant"] = self.fcl_objects_by_id_old["plant"]
+            self.fcl_managers_by_id["plant"] = self.fcl_managers_by_id_old["plant"]
         else:
             self.fcl_objects_by_id = {}
         # compute glass params
@@ -366,7 +370,7 @@ class PourWaterPlantPosControlEnv(FluidEnv):
             pyflex.set_positions(fluid_pos)
             print("stablize water!")
             for _ in range(100):
-                pyflex.step(render=True)
+                pyflex.step(render=self._render)
 
             state_dic = self.get_state()
             water_state = state_dic['particle_pos'].reshape((-1, self.dim_position))
@@ -548,11 +552,15 @@ class PourWaterPlantPosControlEnv(FluidEnv):
         #Adds a collision box to the cache
         if obj_id not in self.fcl_objects_by_id:
             self.fcl_objects_by_id[obj_id] = []
+            #assumes also not in managers
+            self.fcl_managers_by_id[obj_id] = fcl.DynamicAABBTreeCollisionManager()
+            self.fcl_managers_by_id[obj_id].setup()
         fullEdge = 2*halfEdge
         fcl_object = make_fcl_box(fullEdge, center, quat)
         self.fcl_objects_by_id[obj_id].append(fcl_object)
+        self.fcl_managers_by_id[obj_id].registerObjects([fcl_object])
         
-    def in_collision(self, idx1, idx2):
+    def in_collision_object(self, idx1, idx2):
         obj1 = self.fcl_objects_by_id[idx1]
         obj2 = self.fcl_objects_by_id[idx2] #represent collision shapes of 
         #complex objects using a list of their primitives
@@ -561,8 +569,28 @@ class PourWaterPlantPosControlEnv(FluidEnv):
             result = fcl.CollisionResult()
             ret = fcl.collide(prim1, prim2, request, result)
             if ret:
-                return True
+                for contact in result.contacts:
+                    if contact.penetration_depth > 1e-100:
+                        return True
         return False
+
+    def in_collision_manager(self, idx1, idx2):
+        manager1 = self.fcl_managers_by_id[idx1]
+        manager2 = self.fcl_managers_by_id[idx2] #represent collision shapes of 
+        request = fcl.CollisionRequest()
+        rdata = fcl.CollisionData(request = request)
+        manager1.collide(manager2, rdata, fcl.defaultCollisionCallback)
+        return rdata.result.is_collision
+        
+
+    def in_collision(self, idx1, idx2, use_manager=True):
+        start = time.time() 
+        if use_manager:
+            result = self.in_collision_manager(idx1, idx2)
+        else:
+            result = self.in_collision_object(idx1, idx2)
+        return result
+
 
     def in_collision_sphere(self, center, radius, obj_idxs = []):
         sphere_shape = fcl.Sphere(radius)
@@ -580,6 +608,7 @@ class PourWaterPlantPosControlEnv(FluidEnv):
         return False
 
     def in_collision_sphere_premade(self, center, sphere, obj_idxs = []):
+        sphere_shape = fcl.Sphere(radius)
         tf = fcl.Transform(center)
         sphere.setTransform(tf)
         for obj_idx in obj_idxs:
