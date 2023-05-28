@@ -192,7 +192,7 @@ class PourWaterPlantPosControlEnv(FluidEnv):
         self.glass_states = state_dic['glass_states']
         self.poured_glass_states = state_dic['poured_glass_states']
         for _ in range(5):
-            pyflex.step()
+            pyflex.step(render=self._render)
 
     def initialize_camera(self):
         self.camera_params = {
@@ -395,7 +395,7 @@ class PourWaterPlantPosControlEnv(FluidEnv):
 
                 pyflex.set_positions(water_state)
                 for _ in range(40):
-                    pyflex.step()
+                    pyflex.step(render=self._render)
 
                 state_dic = self.get_state()
                 water_state = state_dic['particle_pos'].reshape((-1, self.dim_position))
@@ -404,7 +404,7 @@ class PourWaterPlantPosControlEnv(FluidEnv):
                 not_total_num = np.sum(not_in_glass)
 
             for _ in range(30):
-                pyflex.step()
+                pyflex.step(render=self._render)
         else:  # set to passed-in cached init states
             self.set_state(states)
 
@@ -584,7 +584,6 @@ class PourWaterPlantPosControlEnv(FluidEnv):
         
 
     def in_collision(self, idx1, idx2, use_manager=True):
-        start = time.time() 
         if use_manager:
             result = self.in_collision_manager(idx1, idx2)
         else:
@@ -842,6 +841,7 @@ class PourWaterPlantPosControlEnv(FluidEnv):
             center = np.mean(ranges, axis=1)
             halfEdge = (ranges[:,-1] - ranges[:,0])/2.
             self.fcl_plant_bbox =  make_fcl_box(halfEdge, center, quat_xyzw)
+        self.fcl_managers_by_id[obj_idx].update()
 
 
     def in_glass(self, water, glass_states, border, height):
